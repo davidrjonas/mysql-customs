@@ -71,13 +71,18 @@ struct Transform {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 enum TransformKind {
     Empty,
     Replace,
     Firstname,
     Lastname,
     EmailHash,
+    Organization,
+    Addr1,
+    Addr2,
+    City,
+    PostalCode,
 }
 
 struct Output {
@@ -356,6 +361,8 @@ impl TableInfo {
 
 impl TransformKind {
     fn apply(&self, config: Option<&String>, value: &mut mysql::Value) {
+        use fake::faker::address::en::*;
+        use fake::faker::company::en::CompanyName;
         use fake::faker::name::en::*;
         use fake::Fake;
 
@@ -366,12 +373,12 @@ impl TransformKind {
                 None => *value = mysql::Value::Bytes(Vec::new()),
             },
             TransformKind::Firstname => {
-                let name: &str = FirstName().fake();
-                *value = mysql::Value::Bytes(name.as_bytes().to_owned())
+                let name: String = FirstName().fake();
+                *value = mysql::Value::Bytes(name.into())
             }
             TransformKind::Lastname => {
-                let name: &str = LastName().fake();
-                *value = mysql::Value::Bytes(name.as_bytes().to_owned())
+                let name: String = LastName().fake();
+                *value = mysql::Value::Bytes(name.into())
             }
             TransformKind::EmailHash => {
                 let email = match value {
@@ -380,6 +387,51 @@ impl TransformKind {
                 };
                 *value = mysql::Value::Bytes(email.into())
             }
+            TransformKind::Organization => match value {
+                mysql::Value::Bytes(b) if b.len() > 0 => {
+                    let name: String = CompanyName().fake();
+                    *value = mysql::Value::Bytes(name.into());
+                }
+                mysql::Value::Bytes(_) => {}
+                _ => *value = mysql::Value::Bytes(Vec::new()),
+            },
+            TransformKind::Addr1 => match value {
+                mysql::Value::Bytes(b) if b.len() > 0 => {
+                    let name = format!(
+                        "{} {} {}",
+                        rand::random::<u8>(),
+                        StreetName().fake::<String>(),
+                        StreetSuffix().fake::<&str>()
+                    );
+                    *value = mysql::Value::Bytes(name.into());
+                }
+                mysql::Value::Bytes(_) => {}
+                _ => *value = mysql::Value::Bytes(Vec::new()),
+            },
+            TransformKind::Addr2 => match value {
+                mysql::Value::Bytes(b) if b.len() > 0 => {
+                    let name: String = SecondaryAddress().fake();
+                    *value = mysql::Value::Bytes(name.into());
+                }
+                mysql::Value::Bytes(_) => {}
+                _ => *value = mysql::Value::Bytes(Vec::new()),
+            },
+            TransformKind::City => match value {
+                mysql::Value::Bytes(b) if b.len() > 0 => {
+                    let name: String = CityName().fake();
+                    *value = mysql::Value::Bytes(name.into());
+                }
+                mysql::Value::Bytes(_) => {}
+                _ => *value = mysql::Value::Bytes(Vec::new()),
+            },
+            TransformKind::PostalCode => match value {
+                mysql::Value::Bytes(b) if b.len() > 0 => {
+                    let name: String = PostCode().fake();
+                    *value = mysql::Value::Bytes(name.into());
+                }
+                mysql::Value::Bytes(_) => {}
+                _ => *value = mysql::Value::Bytes(Vec::new()),
+            },
         }
     }
 }
