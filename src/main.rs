@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -37,7 +38,7 @@ struct Args {
 }
 
 //#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, clap::ArgEnum)]
-#[derive(Clone, Debug, clap::ArgEnum)]
+#[derive(Copy, Clone, Debug, PartialEq, clap::ArgEnum)]
 #[clap(rename_all = "lowercase")]
 enum OutputKind {
     Dir,
@@ -119,7 +120,7 @@ impl Output {
 
                 println!("Creating file {:?}", filename);
 
-                let fh = std::fs::File::create(&filename).wrap_err_with(|| {
+                let fh = File::create(&filename).wrap_err_with(|| {
                     format!("Failed to create file for writing; {:?}", &filename)
                 })?;
 
@@ -133,9 +134,74 @@ impl Output {
     }
 }
 
+impl OutputKind {
+    fn progress_writer(&self, label: &str, total: usize) -> Box<dyn Progress> {
+        match self {
+            OutputKind::Stdout => Box::new(NullProgress {}),
+            OutputKind::Dir => Box::new(FileProgress::new(label, total)),
+        }
+    }
+}
+
+trait Progress {
+    fn update(&mut self, _count: usize);
+}
+
+struct FileProgress {
+    bar: Option<progress::Bar>,
+    total: usize,
+    one_perc: usize,
+}
+
+impl FileProgress {
+    fn new(label: &str, total: usize) -> Self {
+        let bar = if total > 100 {
+            let mut bar = progress::Bar::new();
+            bar.set_job_title(label);
+            Some(bar)
+        } else {
+            println!("{label} is pretty small, no progress bar needed");
+            None
+        };
+
+        Self {
+            bar,
+            total,
+            one_perc: total / 100,
+        }
+    }
+}
+
+struct NullProgress;
+
+impl Progress for NullProgress {
+    fn update(&mut self, _count: usize) {
+        ()
+    }
+}
+
+impl Progress for FileProgress {
+    fn update(&mut self, count: usize) {
+        if let Some(ref mut bar) = self.bar {
+            if self.one_perc > 0 && count % self.one_perc == 0 {
+                let percent_done = ((count as f64 / self.total as f64) * 100.0) as i32;
+                bar.reach_percent(percent_done);
+            }
+        }
+    }
+}
+
+impl Drop for FileProgress {
+    fn drop(&mut self) {
+        if let Some(ref mut bar) = self.bar {
+            bar.jobs_done();
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
-    let f = std::fs::File::open(args.configfile).wrap_err("Could open config file")?;
+    let f = File::open(args.configfile).wrap_err("Could open config file")?;
     let config: Config = serde_yaml::from_reader(f).wrap_err("Failed to parse config file")?;
 
     let output = Output::new(args.output, &args.target_directory, args.compress)?;
@@ -150,6 +216,7 @@ fn main() -> Result<()> {
                 db,
                 table_name,
                 table,
+                args.output,
             )?;
         }
     }
@@ -159,13 +226,15 @@ fn main() -> Result<()> {
 
 fn process_table(
     mysql: mysql::Pool,
-    writer: impl std::io::Write,
+    writer: Box<dyn Write>,
     db_name: &str,
     _db: &Database,
     table_name: &str,
     table: &Table,
+    output_kind: OutputKind,
 ) -> Result<()> {
-    let info = match TableInfo::get(&mysql, db_name, table_name)? {
+    let filter = table.filter.as_deref().unwrap_or("1");
+    let info = match TableInfo::get(&mysql, db_name, table_name, filter)? {
         Some(info) => info,
         None => {
             eprintln!("## Table is empty, not writing; {db_name}.{table_name}");
@@ -175,15 +244,18 @@ fn process_table(
 
     let sql = format!(
         "SELECT * FROM `{db_name}`.`{table_name}` WHERE {} ORDER BY {} ASC",
-        table.filter.as_deref().unwrap_or("1"),
+        filter,
         table.order_column.as_deref().unwrap_or("id"),
     );
 
     let rows: Vec<mysql::Row> = mysql.get_conn()?.query(sql)?;
 
+    let mut progress =
+        output_kind.progress_writer(format!("{db_name}.{table_name}").as_str(), info.row_count);
     let mut wtr = csv::WriterBuilder::new().from_writer(writer);
     wtr.serialize(&info.column_names)?;
 
+    let mut count = 0;
     for row in rows.into_iter() {
         //dbg!("{:?}", &row);
         let mut values = row.unwrap();
@@ -196,6 +268,9 @@ fn process_table(
 
         let ser = &ser_mysql::Row::new(&info.column_types, &values);
         wtr.serialize(ser)?;
+
+        count += 1;
+        progress.update(count);
     }
 
     Ok(())
@@ -207,13 +282,27 @@ struct TableInfo {
     columns_by_name: HashMap<String, usize>,
     pub column_types: Vec<mysql::consts::ColumnType>,
     pub column_names: Vec<String>,
+    row_count: usize,
 }
 
 impl TableInfo {
-    pub fn get(mysql: &mysql::Pool, db_name: &str, table_name: &str) -> Result<Option<Self>> {
+    pub fn get(
+        mysql: &mysql::Pool,
+        db_name: &str,
+        table_name: &str,
+        filter: &str,
+    ) -> Result<Option<Self>> {
+        let row_count: usize = mysql
+            .get_conn()?
+            .query_first(format!(
+                "SELECT COUNT(*) FROM `{db_name}`.`{table_name}` WHERE {} LIMIT 1",
+                filter
+            ))?
+            .wrap_err_with(|| format!("failed to get count of {db_name}.{table_name}"))?;
+
         let maybe_row: Option<mysql::Row> = mysql
             .get_conn()?
-            .query_first(format!("SELECT * FROM `{db_name}`.`{table_name}` LIMIT 1"))?;
+            .query_first(format!("SELECT * FROM `{db_name}`.`{table_name}` LIMIT 1",))?;
         match maybe_row {
             None => Ok(None),
             Some(row) => Ok(Some(Self {
@@ -226,6 +315,7 @@ impl TableInfo {
                     .iter()
                     .map(|c| c.name_str().to_string())
                     .collect(),
+                row_count,
             })),
         }
     }
