@@ -5,6 +5,9 @@ A MySQL Sanitizer for Development.
 
 This program reads MySQL tables then writes the data as CSV files transforming the data in the process. 
 
+> You end up with customized stuff, having gone through customs, as is customary.
+>      - Chuck Musser
+
 Usage
 -----
 
