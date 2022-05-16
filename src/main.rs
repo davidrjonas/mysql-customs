@@ -10,9 +10,11 @@ use flate2::{write::GzEncoder, Compression};
 use indexmap::IndexMap;
 use mysql::prelude::*;
 use serde::Deserialize;
-use xxhash_rust::xxh3;
 
 mod ser_mysql;
+mod transforms;
+
+use transforms::*;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -61,28 +63,6 @@ struct Table {
     order_column: Option<String>,
     filter: Option<String>,
     transforms: Option<Vec<Transform>>,
-}
-
-#[derive(Deserialize)]
-struct Transform {
-    column: String,
-    kind: TransformKind,
-    config: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum TransformKind {
-    Empty,
-    Replace,
-    Firstname,
-    Lastname,
-    EmailHash,
-    Organization,
-    Addr1,
-    Addr2,
-    City,
-    PostalCode,
 }
 
 struct Output {
@@ -357,96 +337,4 @@ impl TableInfo {
     fn column_types(row: &mysql::Row) -> Vec<mysql::consts::ColumnType> {
         row.columns_ref().iter().map(|c| c.column_type()).collect()
     }
-}
-
-impl TransformKind {
-    fn apply(&self, config: Option<&String>, value: &mut mysql::Value) {
-        use fake::faker::address::en::*;
-        use fake::faker::company::en::CompanyName;
-        use fake::faker::name::en::*;
-        use fake::Fake;
-
-        match self {
-            TransformKind::Empty => *value = mysql::Value::Bytes(Vec::new()),
-            TransformKind::Replace => match config {
-                Some(s) => *value = mysql::Value::Bytes(s.as_bytes().to_owned()),
-                None => *value = mysql::Value::Bytes(Vec::new()),
-            },
-            TransformKind::Firstname => {
-                let name: String = FirstName().fake();
-                *value = mysql::Value::Bytes(name.into())
-            }
-            TransformKind::Lastname => {
-                let name: String = LastName().fake();
-                *value = mysql::Value::Bytes(name.into())
-            }
-            TransformKind::EmailHash => {
-                let email = match value {
-                    mysql::Value::Bytes(b) => hash_email(b),
-                    _ => random_string(10),
-                };
-                *value = mysql::Value::Bytes(email.into())
-            }
-            TransformKind::Organization => match value {
-                mysql::Value::Bytes(b) if b.len() > 0 => {
-                    let name: String = CompanyName().fake();
-                    *value = mysql::Value::Bytes(name.into());
-                }
-                mysql::Value::Bytes(_) => {}
-                _ => *value = mysql::Value::Bytes(Vec::new()),
-            },
-            TransformKind::Addr1 => match value {
-                mysql::Value::Bytes(b) if b.len() > 0 => {
-                    let name = format!(
-                        "{} {} {}",
-                        rand::random::<u8>(),
-                        StreetName().fake::<String>(),
-                        StreetSuffix().fake::<&str>()
-                    );
-                    *value = mysql::Value::Bytes(name.into());
-                }
-                mysql::Value::Bytes(_) => {}
-                _ => *value = mysql::Value::Bytes(Vec::new()),
-            },
-            TransformKind::Addr2 => match value {
-                mysql::Value::Bytes(b) if b.len() > 0 => {
-                    let name: String = SecondaryAddress().fake();
-                    *value = mysql::Value::Bytes(name.into());
-                }
-                mysql::Value::Bytes(_) => {}
-                _ => *value = mysql::Value::Bytes(Vec::new()),
-            },
-            TransformKind::City => match value {
-                mysql::Value::Bytes(b) if b.len() > 0 => {
-                    let name: String = CityName().fake();
-                    *value = mysql::Value::Bytes(name.into());
-                }
-                mysql::Value::Bytes(_) => {}
-                _ => *value = mysql::Value::Bytes(Vec::new()),
-            },
-            TransformKind::PostalCode => match value {
-                mysql::Value::Bytes(b) if b.len() > 0 => {
-                    let name: String = PostCode().fake();
-                    *value = mysql::Value::Bytes(name.into());
-                }
-                mysql::Value::Bytes(_) => {}
-                _ => *value = mysql::Value::Bytes(Vec::new()),
-            },
-        }
-    }
-}
-
-fn random_string(len: usize) -> String {
-    use rand::{distributions::Alphanumeric, Rng};
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect()
-}
-
-fn hash_email(b: &[u8]) -> String {
-    let mut name = base64::encode(xxh3::xxh3_64(b).to_le_bytes());
-    name.truncate(11);
-    format!("{name}@example.com",)
 }
