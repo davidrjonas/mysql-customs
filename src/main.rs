@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use color_eyre::eyre::ContextCompat;
 use color_eyre::eyre::{Result, WrapErr};
+use flate2::{write::GzEncoder, Compression};
 use indexmap::IndexMap;
 use mysql::prelude::*;
 use serde::Deserialize;
@@ -29,6 +31,9 @@ struct Args {
 
     #[clap(short, long, env, default_value = "trunk")]
     target_directory: PathBuf,
+
+    #[clap(long, env)]
+    compress: bool,
 }
 
 //#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, clap::ArgEnum)]
@@ -75,30 +80,11 @@ enum TransformKind {
 struct Output {
     kind: OutputKind,
     dir: PathBuf,
-}
-
-enum OutputWriter {
-    Stdout(std::io::Stdout),
-    File(std::fs::File),
-}
-
-impl std::io::Write for OutputWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match self {
-            Self::Stdout(fh) => fh.write(buf),
-            Self::File(fh) => fh.write(buf),
-        }
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        match self {
-            Self::Stdout(fh) => fh.flush(),
-            Self::File(fh) => fh.flush(),
-        }
-    }
+    compress: bool,
 }
 
 impl Output {
-    fn new(kind: OutputKind, dir: &Path) -> Result<Self> {
+    fn new(kind: OutputKind, dir: &Path, compress: bool) -> Result<Self> {
         match kind {
             OutputKind::Dir => Self::init_dir(dir)?,
             OutputKind::Stdout => {}
@@ -107,6 +93,7 @@ impl Output {
         Ok(Self {
             kind,
             dir: dir.to_owned(),
+            compress,
         })
     }
 
@@ -118,21 +105,29 @@ impl Output {
         Ok(())
     }
 
-    fn writer(&self, db_name: &str, table_name: &str) -> Result<OutputWriter> {
+    fn writer(&self, db_name: &str, table_name: &str) -> Result<Box<dyn Write>> {
         match self.kind {
             OutputKind::Stdout => {
                 println!("## {}.{}", db_name, table_name);
-                Ok(OutputWriter::Stdout(std::io::stdout()))
+                Ok(Box::new(std::io::stdout()))
             }
             OutputKind::Dir => {
+                let ext = if self.compress { "csv.gz" } else { "csv" };
                 let filename = self.dir.join(Path::new(
-                    format!("{}.{}.csv", db_name, table_name).as_str(),
+                    format!("{}.{}.{}", db_name, table_name, ext).as_str(),
                 ));
+
                 println!("Creating file {:?}", filename);
+
                 let fh = std::fs::File::create(&filename).wrap_err_with(|| {
                     format!("Failed to create file for writing; {:?}", &filename)
                 })?;
-                Ok(OutputWriter::File(fh))
+
+                if self.compress {
+                    Ok(Box::new(GzEncoder::new(fh, Compression::default())))
+                } else {
+                    Ok(Box::new(fh))
+                }
             }
         }
     }
@@ -143,7 +138,7 @@ fn main() -> Result<()> {
     let f = std::fs::File::open(args.configfile).wrap_err("Could open config file")?;
     let config: Config = serde_yaml::from_reader(f).wrap_err("Failed to parse config file")?;
 
-    let output = Output::new(args.output, &args.target_directory)?;
+    let output = Output::new(args.output, &args.target_directory, args.compress)?;
     let pool = mysql::Pool::new(mysql::Opts::from_url(&args.database_url)?)?;
 
     for (db_name, db) in config.databases.iter() {

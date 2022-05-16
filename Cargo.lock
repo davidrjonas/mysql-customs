@@ -694,6 +694,7 @@ dependencies = [
  "color-eyre",
  "csv",
  "fake",
+ "flate2",
  "indexmap",
  "mysql",
  "serde",

@@ -10,6 +10,7 @@ clap = { version = "3.1", features = ["env", "derive", "wrap_help"] }
 color-eyre = "0.6"
 csv = "1.1"
 fake = "2.4"
+flate2 = "1"
 indexmap = { version = "1.8", features = ["serde"] }
 mysql = "22"
 serde = { version = "1", features = ["derive"] }
