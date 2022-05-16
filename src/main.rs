@@ -10,6 +10,7 @@ use flate2::{write::GzEncoder, Compression};
 use indexmap::IndexMap;
 use mysql::prelude::*;
 use serde::Deserialize;
+use xxhash_rust::xxh3;
 
 mod ser_mysql;
 
@@ -76,6 +77,7 @@ enum TransformKind {
     Replace,
     Firstname,
     Lastname,
+    EmailHash,
 }
 
 struct Output {
@@ -354,8 +356,7 @@ impl TableInfo {
 
 impl TransformKind {
     fn apply(&self, config: Option<&String>, value: &mut mysql::Value) {
-        use fake::faker::name::en::FirstName;
-        use fake::faker::name::en::LastName;
+        use fake::faker::name::en::*;
         use fake::Fake;
 
         match self {
@@ -372,6 +373,28 @@ impl TransformKind {
                 let name: &str = LastName().fake();
                 *value = mysql::Value::Bytes(name.as_bytes().to_owned())
             }
+            TransformKind::EmailHash => {
+                let email = match value {
+                    mysql::Value::Bytes(b) => hash_email(b),
+                    _ => random_string(10),
+                };
+                *value = mysql::Value::Bytes(email.into())
+            }
         }
     }
+}
+
+fn random_string(len: usize) -> String {
+    use rand::{distributions::Alphanumeric, Rng};
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect()
+}
+
+fn hash_email(b: &[u8]) -> String {
+    let mut name = base64::encode(xxh3::xxh3_64(b).to_le_bytes());
+    name.truncate(11);
+    format!("{name}@example.com",)
 }

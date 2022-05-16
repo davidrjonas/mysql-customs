@@ -690,6 +690,7 @@ checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 name = "junkinthetrunk"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "clap",
  "color-eyre",
  "csv",
@@ -698,9 +699,11 @@ dependencies = [
  "indexmap",
  "mysql",
  "progress",
+ "rand",
  "serde",
  "serde_json",
  "serde_yaml",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -1739,6 +1742,12 @@ checksum = "129e027ad65ce1453680623c3fb5163cbf7107bfe1aa32257e7d0e63f9ced188"
 dependencies = [
  "tap",
 ]
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "074914ea4eec286eb8d1fd745768504f420a1f7b7919185682a4a267bed7d2e7"
 
 [[package]]
 name = "yaml-rust"
