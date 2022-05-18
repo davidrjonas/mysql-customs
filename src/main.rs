@@ -66,7 +66,7 @@ pub struct Table {
 pub struct RelatedTable {
     pub table: String,
     pub column: String,
-    pub foreign_column: String,
+    pub foreign_column: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -145,7 +145,7 @@ fn process_table(
                 related_only.table,
                 related_only.column,
                 table_name,
-                related_only.foreign_column
+                related_only.foreign_column.as_deref().unwrap_or("id"),
             )
             .as_str(),
         );
