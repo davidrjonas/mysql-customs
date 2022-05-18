@@ -11,6 +11,7 @@ pub struct TraceFilter {
 
 #[derive(Deserialize)]
 pub struct TraceFilterSource {
+    pub db: String,
     pub table: String,
     pub column: String,
     pub filter: String,
@@ -30,9 +31,10 @@ impl TraceFilter {
         conn.query_drop(sql)?;
 
         let sql = format!(
-            "CREATE TEMPORARY TABLE IF NOT EXISTS `{}` AS (SELECT `{}` FROM `{}` WHERE {} ORDER BY `{}` ASC)",
+            "CREATE TEMPORARY TABLE IF NOT EXISTS `{}` AS (SELECT `{}` FROM `{}`.`{}` WHERE {} ORDER BY `{}` ASC)",
             table_name,
             self.source.column,
+            self.source.db,
             self.source.table,
             self.source.filter,
             self.source.column,
