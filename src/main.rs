@@ -75,11 +75,11 @@ fn main() -> Result<()> {
     let config: Config = serde_yaml::from_reader(f).wrap_err("Failed to parse config file")?;
 
     let output = Output::new(args.output, &args.target_directory, args.compress)?;
-    let pool = mysql::Pool::new(mysql::Opts::from_url(&args.database_url)?)?;
+    let opts = mysql::Opts::from_url(&args.database_url)?;
 
     for (db_name, db) in config.databases.iter() {
-        let mut conn = pool.get_conn()?;
-        conn.as_mut().select_db(db_name);
+        let mut conn =
+            mysql::Conn::new(mysql::OptsBuilder::from_opts(opts.clone()).db_name(Some(db_name)))?;
 
         if let Some(tf_list) = &db.trace_filters {
             tf_list.setup(&mut conn)?;
@@ -102,7 +102,7 @@ fn main() -> Result<()> {
 }
 
 fn process_table(
-    conn: &mut mysql::PooledConn,
+    conn: &mut mysql::Conn,
     writer: Box<dyn Write>,
     db_name: &str,
     db: &Database,

@@ -15,7 +15,7 @@ pub struct TableInfo {
 
 impl TableInfo {
     pub fn get(
-        conn: &mut mysql::PooledConn,
+        conn: &mut mysql::Conn,
         db_name: &str,
         table_name: &str,
         filter: &str,

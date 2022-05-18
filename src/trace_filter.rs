@@ -20,7 +20,7 @@ pub struct TraceFilterSource {
 pub struct TraceFilterList(Vec<TraceFilter>);
 
 impl TraceFilter {
-    fn setup(&self, conn: &mut mysql::PooledConn) -> Result<()> {
+    fn setup(&self, conn: &mut mysql::Conn) -> Result<()> {
         println!("# Setting up trace filter '{}'", self.name);
 
         let table_name = self.table_name();
@@ -76,7 +76,7 @@ impl std::ops::Deref for TraceFilterList {
 }
 
 impl TraceFilterList {
-    pub fn setup(&self, conn: &mut mysql::PooledConn) -> Result<()> {
+    pub fn setup(&self, conn: &mut mysql::Conn) -> Result<()> {
         for tf in self.as_ref() {
             tf.setup(conn)?;
         }
