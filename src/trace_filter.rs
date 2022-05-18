@@ -26,12 +26,12 @@ impl TraceFilter {
 
         let table_name = self.table_name();
 
-        let sql = format!("DROP TABLE IF EXISTS `{table_name}`");
+        let sql = format!("DROP TEMPORARY TABLE IF EXISTS `{table_name}`");
         dbg!(&sql);
         conn.query_drop(sql)?;
 
         let sql = format!(
-            "CREATE TEMPORARY TABLE IF NOT EXISTS `{}` AS (SELECT `{}` FROM `{}`.`{}` WHERE {} ORDER BY `{}` ASC)",
+            "CREATE TEMPORARY TABLE `{}` AS (SELECT `{}` FROM `{}`.`{}` WHERE {} ORDER BY `{}` ASC)",
             table_name,
             self.source.column,
             self.source.db,
