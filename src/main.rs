@@ -59,7 +59,7 @@ pub struct Table {
     pub order_column: Option<String>,
     pub filter: Option<String>,
     pub transforms: Option<Vec<Transform>>,
-    pub related: Option<RelatedTable>,
+    pub related_only: Option<RelatedTable>,
 }
 
 #[derive(Deserialize)]
@@ -129,6 +129,50 @@ fn process_table(
             filter.push_str(&tf_join_filter);
 
             join.push_str(&tf_join);
+        }
+    }
+
+    if let Some(related_only) = &table.related_only {
+        // If table has related_only then we want to join to that other table and let its filtering
+        // filter this table. So we'll need to add the join and then add the trace filters that the
+        // _other table_ would have. OR we could select into a temp table the filter data we need
+        // from the other table and join on that. That seems safer/easier but two steps.
+
+        join.push_str(
+            format!(
+                " LEFT JOIN `{}` ON `{}`.`{}` = `{}`.`{}`",
+                related_only.table,
+                related_only.table,
+                related_only.column,
+                table_name,
+                related_only.foreign_column
+            )
+            .as_str(),
+        );
+
+        filter.push_str(
+            format!(
+                " AND `{}`.`{}` IS NOT NULL",
+                related_only.table, related_only.column
+            )
+            .as_str(),
+        );
+
+        if let Some(tf_list) = &db.trace_filters {
+            let related_info = match TableInfo::get(conn, db_name, table_name, &filter)? {
+                Some(info) => info,
+                None => {
+                    eprintln!("## Related table is empty, not writing; {db_name}.{table_name}");
+                    return Ok(());
+                }
+            };
+
+            let (related_join, related_filter) = tf_list.get_join_filter(db, &related_info);
+
+            if !related_join.is_empty() {
+                join.push_str(&related_join);
+                filter.push_str(&related_filter);
+            }
         }
     }
 
