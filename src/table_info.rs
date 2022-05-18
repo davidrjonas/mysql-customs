@@ -6,7 +6,7 @@ use mysql::prelude::*;
 
 pub struct TableInfo {
     db_name: String,
-    table_name: String,
+    pub table_name: String,
     columns_by_name: HashMap<String, usize>,
     pub column_types: Vec<mysql::consts::ColumnType>,
     pub column_names: Vec<String>,
@@ -15,22 +15,21 @@ pub struct TableInfo {
 
 impl TableInfo {
     pub fn get(
-        mysql: &mysql::Pool,
+        conn: &mut mysql::PooledConn,
         db_name: &str,
         table_name: &str,
         filter: &str,
     ) -> Result<Option<Self>> {
-        let row_count: usize = mysql
-            .get_conn()?
+        let row_count: usize = conn
             .query_first(format!(
-                "SELECT COUNT(*) FROM `{db_name}`.`{table_name}` WHERE {} LIMIT 1",
+                "SELECT COUNT(*) FROM `{table_name}` WHERE {} LIMIT 1",
                 filter
             ))?
             .wrap_err_with(|| format!("failed to get count of {db_name}.{table_name}"))?;
 
-        let maybe_row: Option<mysql::Row> = mysql
-            .get_conn()?
-            .query_first(format!("SELECT * FROM `{db_name}`.`{table_name}` LIMIT 1",))?;
+        let maybe_row: Option<mysql::Row> = conn.query_first(format!(
+            "SELECT `{table_name}`.* FROM `{table_name}` LIMIT 1",
+        ))?;
         match maybe_row {
             None => Ok(None),
             Some(row) => Ok(Some(Self {

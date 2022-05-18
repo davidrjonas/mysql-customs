@@ -11,10 +11,12 @@ use serde::Deserialize;
 mod output;
 mod ser_mysql;
 mod table_info;
+mod trace_filter;
 mod transforms;
 
 use output::*;
 use table_info::*;
+use trace_filter::*;
 use transforms::*;
 
 #[derive(Parser, Debug)]
@@ -47,15 +49,24 @@ struct Config {
 }
 
 #[derive(Deserialize)]
-struct Database {
-    tables: IndexMap<String, Table>,
+pub struct Database {
+    pub tables: IndexMap<String, Table>,
+    pub trace_filters: Option<TraceFilterList>,
 }
 
 #[derive(Deserialize)]
-struct Table {
-    order_column: Option<String>,
-    filter: Option<String>,
-    transforms: Option<Vec<Transform>>,
+pub struct Table {
+    pub order_column: Option<String>,
+    pub filter: Option<String>,
+    pub transforms: Option<Vec<Transform>>,
+    pub related: Option<RelatedTable>,
+}
+
+#[derive(Deserialize)]
+pub struct RelatedTable {
+    pub table: String,
+    pub column: String,
+    pub foreign_column: String,
 }
 
 fn main() -> Result<()> {
@@ -67,9 +78,16 @@ fn main() -> Result<()> {
     let pool = mysql::Pool::new(mysql::Opts::from_url(&args.database_url)?)?;
 
     for (db_name, db) in config.databases.iter() {
+        let mut conn = pool.get_conn()?;
+        conn.as_mut().select_db(db_name);
+
+        if let Some(tf_list) = &db.trace_filters {
+            tf_list.setup(&mut conn)?;
+        }
+
         for (table_name, table) in db.tables.iter() {
             process_table(
-                pool.clone(),
+                &mut conn,
                 output.writer(db_name, table_name)?,
                 db_name,
                 db,
@@ -84,16 +102,17 @@ fn main() -> Result<()> {
 }
 
 fn process_table(
-    mysql: mysql::Pool,
+    conn: &mut mysql::PooledConn,
     writer: Box<dyn Write>,
     db_name: &str,
-    _db: &Database,
+    db: &Database,
     table_name: &str,
     table: &Table,
     output_kind: OutputKind,
 ) -> Result<()> {
-    let filter = table.filter.as_deref().unwrap_or("1");
-    let info = match TableInfo::get(&mysql, db_name, table_name, filter)? {
+    let mut filter = table.filter.as_deref().unwrap_or("1").to_owned();
+
+    let info = match TableInfo::get(conn, db_name, table_name, &filter)? {
         Some(info) => info,
         None => {
             eprintln!("## Table is empty, not writing; {db_name}.{table_name}");
@@ -101,13 +120,30 @@ fn process_table(
         }
     };
 
+    let mut join = String::new();
+    if let Some(tf_list) = &db.trace_filters {
+        let (tf_join, tf_join_filter) = tf_list.get_join_filter(db, &info);
+
+        if !tf_join_filter.is_empty() {
+            filter.push_str(" AND ");
+            filter.push_str(&tf_join_filter);
+
+            join.push_str(&tf_join);
+        }
+    }
+
     let sql = format!(
-        "SELECT * FROM `{db_name}`.`{table_name}` WHERE {} ORDER BY {} ASC",
+        "SELECT `{}`.* FROM `{}` {} WHERE {} ORDER BY {} ASC",
+        table_name,
+        table_name,
+        join,
         filter,
         table.order_column.as_deref().unwrap_or("id"),
     );
 
-    let rows: Vec<mysql::Row> = mysql.get_conn()?.query(sql)?;
+    dbg!(&sql);
+
+    let rows: Vec<mysql::Row> = conn.query(sql)?;
 
     let mut progress =
         output_kind.progress_writer(format!("{db_name}.{table_name}").as_str(), info.row_count);
