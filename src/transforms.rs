@@ -19,6 +19,7 @@ pub enum TransformKind {
     Empty,
     Replace,
     Firstname,
+    Fullname,
     Lastname,
     EmailHash,
     Organization,
@@ -36,6 +37,10 @@ impl TransformKind {
                 Some(s) => *value = Value::Bytes(s.as_bytes().to_owned()),
                 None => *value = Value::Bytes(Vec::new()),
             },
+            TransformKind::Fullname => {
+                let name: String = Name().fake();
+                *value = Value::Bytes(name.into())
+            }
             TransformKind::Firstname => {
                 let name: String = FirstName().fake();
                 *value = Value::Bytes(name.into())
