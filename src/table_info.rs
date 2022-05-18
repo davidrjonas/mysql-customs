@@ -5,7 +5,7 @@ use color_eyre::eyre::Result;
 use mysql::prelude::*;
 
 pub struct TableInfo {
-    db_name: String,
+    pub db_name: String,
     pub table_name: String,
     columns_by_name: HashMap<String, usize>,
     pub column_types: Vec<mysql::consts::ColumnType>,

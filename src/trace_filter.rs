@@ -2,6 +2,8 @@ use color_eyre::eyre::Result;
 use mysql::prelude::*;
 use serde::Deserialize;
 
+use crate::TableInfo;
+
 #[derive(Deserialize)]
 pub struct TraceFilter {
     pub name: String,
@@ -57,16 +59,30 @@ impl TraceFilter {
         format!("_customs_tmp_{}", self.name)
     }
 
-    fn get_join_filter(&self, table_name: &str, match_column: &str) -> (String, String) {
+    fn get_join_filter(&self, info: &TableInfo) -> (String, String) {
         let tmp_table = self.table_name();
+        let table_name = &info.table_name;
 
-        let join = format!(
-            "LEFT JOIN `{tmp_table}` ON `{table_name}`.`{match_column}` = `{tmp_table}`.id"
-        );
+        match self.match_column(info) {
+            Some(match_column) => (
+                format!(
+                    "LEFT JOIN `{tmp_table}` ON `{table_name}`.`{match_column}` = `{tmp_table}`.id"
+                ),
+                format!("`{tmp_table}`.id IS NOT NULL"),
+            ),
+            None => (String::new(), String::new()),
+        }
+    }
 
-        let filter = format!("`{tmp_table}`.id IS NOT NULL");
+    fn match_column(&self, info: &TableInfo) -> Option<String> {
+        if info.db_name == self.source.db && info.table_name == self.source.table {
+            return Some(self.source.column.clone());
+        }
 
-        (join, filter)
+        self.match_columns
+            .iter()
+            .find(|c| info.column_names.contains(c))
+            .map(|s| s.to_owned())
     }
 }
 
@@ -86,23 +102,15 @@ impl TraceFilterList {
         Ok(())
     }
 
-    pub fn get_join_filter(
-        &self,
-        db: &crate::Database,
-        info: &crate::TableInfo,
-    ) -> (String, String) {
+    pub fn get_join_filter(&self, db: &crate::Database, info: &TableInfo) -> (String, String) {
         match &db.trace_filters {
             Some(tf_list) if tf_list.len() > 0 => {
                 let mut joins: Vec<String> = Vec::new();
                 let mut join_filters: Vec<String> = Vec::new();
 
                 for tf in tf_list.as_ref() {
-                    if let Some(match_column) = tf
-                        .match_columns
-                        .iter()
-                        .find(|c| info.column_names.contains(c))
-                    {
-                        let (join, filter) = tf.get_join_filter(&info.table_name, match_column);
+                    let (join, filter) = tf.get_join_filter(info);
+                    if !join.is_empty() {
                         joins.push(join);
                         join_filters.push(filter);
                     }
