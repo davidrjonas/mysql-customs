@@ -159,13 +159,21 @@ fn process_table(
         );
 
         if let Some(tf_list) = &db.trace_filters {
-            let related_info = match TableInfo::get(conn, db_name, table_name, &filter)? {
-                Some(info) => info,
-                None => {
-                    eprintln!("## Related table is empty, not writing; {db_name}.{table_name}");
-                    return Ok(());
-                }
-            };
+            let related_filter = db
+                .tables
+                .get(&related_only.table)
+                .and_then(|t| t.filter.as_deref())
+                .unwrap_or("1")
+                .to_owned();
+
+            let related_info =
+                match TableInfo::get(conn, db_name, &related_only.table, &related_filter)? {
+                    Some(info) => info,
+                    None => {
+                        eprintln!("## Related table is empty, not writing; {db_name}.{table_name}");
+                        return Ok(());
+                    }
+                };
 
             let (related_join, related_filter) = tf_list.get_join_filter(db, &related_info);
 
