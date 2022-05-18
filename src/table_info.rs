@@ -20,17 +20,21 @@ impl TableInfo {
         table_name: &str,
         filter: &str,
     ) -> Result<Option<Self>> {
+        let sql = format!(
+            "SELECT COUNT(*) FROM `{table_name}` WHERE {} LIMIT 1",
+            filter
+        );
+
+        dbg!(&sql);
+
         let row_count: usize = conn
-            .query_first(format!(
-                "SELECT COUNT(*) FROM `{table_name}` WHERE {} LIMIT 1",
-                filter
-            ))?
+            .query_first(sql)?
             .wrap_err_with(|| format!("failed to get count of {db_name}.{table_name}"))?;
 
-        let maybe_row: Option<mysql::Row> = conn.query_first(format!(
-            "SELECT `{table_name}`.* FROM `{table_name}` LIMIT 1",
-        ))?;
-        match maybe_row {
+        let sql = format!("SELECT `{table_name}`.* FROM `{table_name}` LIMIT 1");
+        dbg!(&sql);
+
+        match conn.query_first(sql)? {
             None => Ok(None),
             Some(row) => Ok(Some(Self {
                 db_name: db_name.into(),
