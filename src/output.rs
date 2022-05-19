@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use clap::ArgEnum;
 use color_eyre::eyre::{Result, WrapErr};
 use flate2::{write::GzEncoder, Compression};
+use indicatif::ProgressBar as Bar;
 
 #[derive(Copy, Clone, Debug, PartialEq, ArgEnum)]
 #[clap(rename_all = "lowercase")]
@@ -83,7 +84,7 @@ pub trait Progress {
 }
 
 struct FileProgress {
-    bar: Option<progress::Bar>,
+    bar: Option<Bar>,
     total: usize,
     one_perc: usize,
 }
@@ -91,8 +92,8 @@ struct FileProgress {
 impl FileProgress {
     pub fn new(label: &str, total: usize) -> Self {
         let bar = if total > 100 {
-            let mut bar = progress::Bar::new();
-            bar.set_job_title(label);
+            let bar = Bar::new(total as u64).with_message(std::borrow::Cow::Owned(label.into()));
+            bar.set_draw_delta(10);
             Some(bar)
         } else {
             println!("{label} is pretty small, no progress bar needed");
@@ -119,8 +120,9 @@ impl Progress for FileProgress {
     fn update(&mut self, count: usize) {
         if let Some(ref mut bar) = self.bar {
             if self.one_perc > 0 && count % self.one_perc == 0 {
-                let percent_done = ((count as f64 / self.total as f64) * 100.0) as i32;
-                bar.reach_percent(percent_done);
+                //let percent_done = ((count as f64 / self.total as f64) * 100.0) as i32;
+                bar.inc(1)
+                //bar.reach_percent(percent_done);
             }
         }
     }
@@ -129,7 +131,7 @@ impl Progress for FileProgress {
 impl Drop for FileProgress {
     fn drop(&mut self) {
         if let Some(ref mut bar) = self.bar {
-            bar.jobs_done();
+            bar.finish_using_style();
         }
     }
 }
