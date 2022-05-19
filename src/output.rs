@@ -85,32 +85,20 @@ pub trait Progress {
 }
 
 struct FileProgress {
-    bar: Option<Bar>,
-    total: usize,
-    one_perc: usize,
+    bar: Bar,
 }
 
 impl FileProgress {
     pub fn new(label: &str, total: usize) -> Self {
-        let bar = if total > 100 {
-            let bar = Bar::new(total as u64).with_message(std::borrow::Cow::Owned(label.into()));
-            bar.set_style(
-                ProgressStyle::default_bar()
-                    .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
-                    .progress_chars("##-"),
-            );
-            bar.set_draw_delta(10);
-            Some(bar)
-        } else {
-            println!("{label} is pretty small, no progress bar needed");
-            None
-        };
+        let bar = Bar::new(total as u64).with_message(std::borrow::Cow::Owned(label.into()));
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+                .progress_chars("##-"),
+        );
+        bar.set_draw_delta(10);
 
-        Self {
-            bar,
-            total,
-            one_perc: total / 100,
-        }
+        Self { bar }
     }
 }
 
@@ -124,21 +112,12 @@ impl Progress for NullProgress {
 
 impl Progress for FileProgress {
     fn update(&mut self, _count: usize) {
-        if let Some(ref mut bar) = self.bar {
-            bar.inc(1)
-            //if self.one_perc > 0 && count % self.one_perc == 0 {
-            //let percent_done = ((count as f64 / self.total as f64) * 100.0) as i32;
-            //    bar.inc(1)
-            //bar.reach_percent(percent_done);
-            //}
-        }
+        self.bar.inc(1)
     }
 }
 
 impl Drop for FileProgress {
     fn drop(&mut self) {
-        if let Some(ref mut bar) = self.bar {
-            bar.finish_at_current_pos();
-        }
+        self.bar.finish_at_current_pos();
     }
 }
