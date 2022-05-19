@@ -188,7 +188,7 @@ fn process_table(
     }
 
     let sql = format!(
-        "SELECT COUNT(`{}`.*) FROM `{}` {} WHERE {} ORDER BY {} ASC",
+        "SELECT COUNT(*) FROM `{}` {} WHERE {} ORDER BY {} ASC",
         table_name,
         table_name,
         join,
