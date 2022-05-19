@@ -177,7 +177,7 @@ fn process_table(
             let (related_join, related_join_filter) = tf_list.get_join_filter(db, &related_info);
 
             if !related_join.is_empty() {
-                join.push_str(" ");
+                join.push(' ');
                 join.push_str(&related_join);
                 filter.push_str(" AND ");
                 filter.push_str(&related_filter);

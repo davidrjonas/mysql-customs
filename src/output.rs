@@ -105,9 +105,7 @@ impl FileProgress {
 struct NullProgress;
 
 impl Progress for NullProgress {
-    fn update(&mut self, _count: usize) {
-        ()
-    }
+    fn update(&mut self, _count: usize) {}
 }
 
 impl Progress for FileProgress {
