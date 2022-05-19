@@ -188,11 +188,8 @@ fn process_table(
     }
 
     let sql = format!(
-        "SELECT COUNT(*) FROM `{}` {} WHERE {} ORDER BY {} ASC",
-        table_name,
-        join,
-        filter,
-        table.order_column.as_deref().unwrap_or("id"),
+        "SELECT COUNT(*) FROM `{}` {} WHERE {}",
+        table_name, join, filter
     );
 
     dbg!(&sql);
@@ -200,11 +197,12 @@ fn process_table(
     let row_count: usize = conn.query_first(sql)?.unwrap_or(0);
 
     let sql = format!(
-        "SELECT `{}`.* FROM `{}` {} WHERE {} ORDER BY {} ASC",
+        "SELECT `{}`.* FROM `{}` {} WHERE {} ORDER BY `{}`.{} ASC",
         table_name,
         table_name,
         join,
         filter,
+        table_name,
         table.order_column.as_deref().unwrap_or("id"),
     );
 
