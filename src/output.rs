@@ -123,13 +123,14 @@ impl Progress for NullProgress {
 }
 
 impl Progress for FileProgress {
-    fn update(&mut self, count: usize) {
+    fn update(&mut self, _count: usize) {
         if let Some(ref mut bar) = self.bar {
-            if self.one_perc > 0 && count % self.one_perc == 0 {
-                //let percent_done = ((count as f64 / self.total as f64) * 100.0) as i32;
-                bar.inc(1)
-                //bar.reach_percent(percent_done);
-            }
+            bar.inc(1)
+            //if self.one_perc > 0 && count % self.one_perc == 0 {
+            //let percent_done = ((count as f64 / self.total as f64) * 100.0) as i32;
+            //    bar.inc(1)
+            //bar.reach_percent(percent_done);
+            //}
         }
     }
 }
