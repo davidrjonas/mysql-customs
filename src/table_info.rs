@@ -10,27 +10,10 @@ pub struct TableInfo {
     columns_by_name: HashMap<String, usize>,
     pub column_types: Vec<mysql::consts::ColumnType>,
     pub column_names: Vec<String>,
-    pub row_count: usize,
 }
 
 impl TableInfo {
-    pub fn get(
-        conn: &mut mysql::Conn,
-        db_name: &str,
-        table_name: &str,
-        filter: &str,
-    ) -> Result<Option<Self>> {
-        let sql = format!(
-            "SELECT COUNT(*) FROM `{table_name}` WHERE {} LIMIT 1",
-            filter
-        );
-
-        dbg!(&sql);
-
-        let row_count: usize = conn
-            .query_first(sql)?
-            .wrap_err_with(|| format!("failed to get count of {db_name}.{table_name}"))?;
-
+    pub fn get(conn: &mut mysql::Conn, db_name: &str, table_name: &str) -> Result<Option<Self>> {
         let sql = format!("SELECT `{table_name}`.* FROM `{table_name}` LIMIT 1");
         dbg!(&sql);
 
@@ -46,7 +29,6 @@ impl TableInfo {
                     .iter()
                     .map(|c| c.name_str().to_string())
                     .collect(),
-                row_count,
             })),
         }
     }

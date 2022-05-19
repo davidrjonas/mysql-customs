@@ -112,7 +112,7 @@ fn process_table(
 ) -> Result<()> {
     let mut filter = table.filter.as_deref().unwrap_or("1").to_owned();
 
-    let info = match TableInfo::get(conn, db_name, table_name, &filter)? {
+    let info = match TableInfo::get(conn, db_name, table_name)? {
         Some(info) => info,
         None => {
             eprintln!("## Table is empty, not writing; {db_name}.{table_name}");
@@ -159,6 +159,14 @@ fn process_table(
         );
 
         if let Some(tf_list) = &db.trace_filters {
+            let related_info = match TableInfo::get(conn, db_name, &related_only.table)? {
+                Some(info) => info,
+                None => {
+                    eprintln!("## Related table is empty, not writing; {db_name}.{table_name}");
+                    return Ok(());
+                }
+            };
+
             let related_filter = db
                 .tables
                 .get(&related_only.table)
@@ -166,25 +174,31 @@ fn process_table(
                 .unwrap_or("1")
                 .to_owned();
 
-            let related_info =
-                match TableInfo::get(conn, db_name, &related_only.table, &related_filter)? {
-                    Some(info) => info,
-                    None => {
-                        eprintln!("## Related table is empty, not writing; {db_name}.{table_name}");
-                        return Ok(());
-                    }
-                };
-
-            let (related_join, related_filter) = tf_list.get_join_filter(db, &related_info);
+            let (related_join, related_join_filter) = tf_list.get_join_filter(db, &related_info);
 
             if !related_join.is_empty() {
                 join.push_str(" ");
                 join.push_str(&related_join);
                 filter.push_str(" AND ");
                 filter.push_str(&related_filter);
+                filter.push_str(" AND ");
+                filter.push_str(&related_join_filter);
             }
         }
     }
+
+    let sql = format!(
+        "SELECT COUNT(`{}`.*) FROM `{}` {} WHERE {} ORDER BY {} ASC",
+        table_name,
+        table_name,
+        join,
+        filter,
+        table.order_column.as_deref().unwrap_or("id"),
+    );
+
+    dbg!(&sql);
+
+    let row_count: usize = conn.query_first(sql)?.unwrap_or(0);
 
     let sql = format!(
         "SELECT `{}`.* FROM `{}` {} WHERE {} ORDER BY {} ASC",
@@ -200,7 +214,7 @@ fn process_table(
     let rows: Vec<mysql::Row> = conn.query(sql)?;
 
     let mut progress =
-        output_kind.progress_writer(format!("{db_name}.{table_name}").as_str(), info.row_count);
+        output_kind.progress_writer(format!("{db_name}.{table_name}").as_str(), row_count);
     let mut wtr = csv::WriterBuilder::new().from_writer(writer);
     wtr.serialize(&info.column_names)?;
 
