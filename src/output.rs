@@ -138,7 +138,7 @@ impl Progress for FileProgress {
 impl Drop for FileProgress {
     fn drop(&mut self) {
         if let Some(ref mut bar) = self.bar {
-            bar.finish_using_style();
+            bar.finish_at_current_pos();
         }
     }
 }
