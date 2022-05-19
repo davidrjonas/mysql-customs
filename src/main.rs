@@ -190,7 +190,6 @@ fn process_table(
     let sql = format!(
         "SELECT COUNT(*) FROM `{}` {} WHERE {} ORDER BY {} ASC",
         table_name,
-        table_name,
         join,
         filter,
         table.order_column.as_deref().unwrap_or("id"),
