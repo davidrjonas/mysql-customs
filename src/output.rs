@@ -6,6 +6,7 @@ use clap::ArgEnum;
 use color_eyre::eyre::{Result, WrapErr};
 use flate2::{write::GzEncoder, Compression};
 use indicatif::ProgressBar as Bar;
+use indicatif::ProgressStyle;
 
 #[derive(Copy, Clone, Debug, PartialEq, ArgEnum)]
 #[clap(rename_all = "lowercase")]
@@ -93,6 +94,11 @@ impl FileProgress {
     pub fn new(label: &str, total: usize) -> Self {
         let bar = if total > 100 {
             let bar = Bar::new(total as u64).with_message(std::borrow::Cow::Owned(label.into()));
+            bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+                    .progress_chars("##-"),
+            );
             bar.set_draw_delta(10);
             Some(bar)
         } else {
