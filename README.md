@@ -48,17 +48,37 @@ databases:
 
 ### Transforms
 
+#### General Manipulation
+
+- `empty`: replace with empty string
+- `null`: replace with \N
+- `replace`: replace with value in `config:` field
+
+#### Hashed Data
+
+Helpful for maintaining uniqueness.
+
+- `email_hash`: [hash of email]@example.com
+- `domain_hash`: 4 char hash of original domain plus example.tld where tld is chosen by hash of original
+
+#### Fake Data
+
 - `addr1`: fake data if not empty
 - `addr2`: fake data if not empty
 - `city`: fake data if not empty
-- `email_hash`: [hash of email]@example.com
-- `empty`: replace with empty string
 - `firstname`: fake data
 - `fullname`: fake data
+- `ipv4`: fake data
+- `ipv6`: fake data
 - `lastname`: fake data
 - `organization`: fake company if not empty
 - `postal_code`: fake data
-- `replace`: replace with value in `config:` field
+- `username`: fake data if not empty
+
+#### Random Data
+
+- `hostname`: keep the first two chars, replace the rest with random alphnums.
+
 
 Concepts
 --------
