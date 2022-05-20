@@ -6,7 +6,9 @@ use clap::Parser;
 use color_eyre::eyre::{Result, WrapErr};
 use indexmap::IndexMap;
 use mysql::prelude::*;
+use rand::{rngs::StdRng, SeedableRng};
 use serde::Deserialize;
+use xxhash_rust::xxh3;
 
 mod output;
 mod ser_mysql;
@@ -234,6 +236,8 @@ fn process_table(
     let mut wtr = csv::WriterBuilder::new().from_writer(writer);
     wtr.serialize(&info.column_names)?;
 
+    let mut rng = get_rng_for_table(db_name, table_name);
+
     let mut count = 0;
     for row in rows.into_iter() {
         //dbg!("{:?}", &row);
@@ -242,7 +246,10 @@ fn process_table(
             let item = values
                 .get_mut(info.get_column_index(transform.column.as_str()))
                 .expect("valid index");
-            transform.kind.apply(transform.config.as_ref(), item);
+
+            transform
+                .kind
+                .apply(&mut rng, transform.config.as_ref(), item);
         }
 
         let ser = &ser_mysql::Row::new(&info.column_types, &values);
@@ -253,4 +260,10 @@ fn process_table(
     }
 
     Ok(())
+}
+
+fn get_rng_for_table(db_name: &str, table_name: &str) -> StdRng {
+    StdRng::seed_from_u64(xxh3::xxh3_64(
+        format!("{}.{}", db_name, table_name).as_bytes(),
+    ))
 }
