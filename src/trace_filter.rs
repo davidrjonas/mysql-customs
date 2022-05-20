@@ -129,23 +129,18 @@ impl TraceFilterList {
         Ok(())
     }
 
-    pub fn get_join_filter(&self, db: &crate::Database, info: &TableInfo) -> (String, String) {
-        match &db.trace_filters {
-            Some(tf_list) if tf_list.len() > 0 => {
-                let mut joins: Vec<String> = Vec::new();
-                let mut join_filters: Vec<String> = Vec::new();
+    pub fn get_join_filter(&self, info: &TableInfo) -> (String, String) {
+        let mut joins: Vec<String> = Vec::new();
+        let mut join_filters: Vec<String> = Vec::new();
 
-                for tf in tf_list.as_ref() {
-                    let (join, filter) = tf.get_join_filter(info);
-                    if !join.is_empty() {
-                        joins.push(join);
-                        join_filters.push(filter);
-                    }
-                }
-
-                (joins.join(" "), join_filters.join(" AND "))
+        for tf in self.as_ref() {
+            let (join, filter) = tf.get_join_filter(info);
+            if !join.is_empty() {
+                joins.push(join);
+                join_filters.push(filter);
             }
-            _ => (String::new(), String::new()),
         }
+
+        (joins.join(" "), join_filters.join(" AND "))
     }
 }

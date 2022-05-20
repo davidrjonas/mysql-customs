@@ -142,7 +142,7 @@ fn process_table(
     };
 
     let mut join = String::new();
-    let (tf_join, tf_join_filter) = trace_filters.get_join_filter(db, &info);
+    let (tf_join, tf_join_filter) = trace_filters.get_join_filter(&info);
 
     if !tf_join_filter.is_empty() {
         filter.push_str(" AND ");
@@ -193,8 +193,7 @@ fn process_table(
                 .unwrap_or("1")
                 .to_owned();
 
-            let (related_join, related_join_filter) =
-                trace_filters.get_join_filter(db, &related_info);
+            let (related_join, related_join_filter) = trace_filters.get_join_filter(&related_info);
 
             if !related_join.is_empty() {
                 join.push(' ');
