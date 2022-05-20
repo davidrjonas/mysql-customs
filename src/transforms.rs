@@ -28,8 +28,8 @@ pub enum TransformKind {
     Firstname,
     Fullname,
     Hostname,
-    IPv4,
-    IPv6,
+    Ipv4,
+    Ipv6,
     Lastname,
     Null,
     Organization,
@@ -127,14 +127,14 @@ impl TransformKind {
                 Value::Bytes(_) => {}
                 _ => *value = Value::Bytes(Vec::new()),
             },
-            TransformKind::IPv4 => match value {
+            TransformKind::Ipv4 => match value {
                 Value::Bytes(b) if !b.is_empty() => {
                     *value = Value::Bytes(IPv4().fake::<String>().into())
                 }
                 Value::Bytes(_) => {}
                 _ => *value = Value::Bytes(Vec::new()),
             },
-            TransformKind::IPv6 => match value {
+            TransformKind::Ipv6 => match value {
                 Value::Bytes(b) if !b.is_empty() => {
                     *value = Value::Bytes(IPv6().fake::<String>().into())
                 }
