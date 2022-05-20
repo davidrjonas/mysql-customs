@@ -6,7 +6,7 @@ use fake::faker::internet::en::{IPv4, IPv6, Username};
 use fake::faker::name::en::*;
 use fake::Fake;
 use mysql::Value;
-use rand::Rng;
+use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 use xxhash_rust::xxh3;
 
@@ -62,7 +62,7 @@ impl TransformKind {
             TransformKind::EmailHash => {
                 let email = match value {
                     Value::Bytes(b) => hash_email(b),
-                    _ => random_string(rng, 10),
+                    _ => random_alphanum(rng, 10),
                 };
                 *value = Value::Bytes(email.into())
             }
@@ -116,11 +116,7 @@ impl TransformKind {
                     let orig = from_utf8(b).unwrap_or("");
                     let name = match orig.len() {
                         0 | 1 | 2 => orig.to_owned(),
-                        len => format!(
-                            "{}{}",
-                            &orig[0..2],
-                            random_string(rng, len - 2).to_ascii_lowercase()
-                        ),
+                        len => format!("{}{}", &orig[0..2], random_alphanum_lower(rng, len - 2)),
                     };
                     *value = Value::Bytes(name.into());
                 }
@@ -158,11 +154,19 @@ impl TransformKind {
     }
 }
 
-fn random_string(rng: &mut impl Rng, len: usize) -> String {
-    rng.sample_iter(&rand::distributions::Alphanumeric)
+fn random_alphanum(rng: &mut impl Rng, len: usize) -> String {
+    rng.sample_iter(&Alphanumeric)
         .take(len)
         .map(char::from)
         .collect()
+}
+
+fn random_alphanum_lower(rng: &mut impl Rng, len: usize) -> String {
+    rng.sample_iter(&Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect::<String>()
+        .to_ascii_lowercase()
 }
 
 fn hash_email(b: &[u8]) -> String {
@@ -173,33 +177,12 @@ fn hash_email(b: &[u8]) -> String {
 
 fn hash_domain(b: &[u8]) -> String {
     let charset = "abcdefghijklmnopqrstuvwxyz0123456789";
-    let hash = xxh3::xxh3_64(b);
-    let encoded: String = hash
+    let encoded: String = xxh3::xxh3_64(b)
         .to_le_bytes()
         .iter()
-        .take(4)
-        .map(|b| {
-            charset
-                .chars()
-                .nth((*b as usize) % charset.len())
-                .expect("invalid offset of charset")
-        })
+        .take(6)
+        .map(|b| (*b as usize) % charset.len())
+        .map(|n| charset.chars().nth(n).expect("invalid offset of charset"))
         .collect();
-    format!("{}.{}", encoded, choose_example_domain(hash))
-}
-
-fn choose_example_domain(n: u64) -> &'static str {
-    let domains = [
-        "example.com",
-        "example.net",
-        "example.org",
-        "example.info",
-        "example.biz",
-        "example.tv",
-        "example.cc",
-    ];
-    domains
-        .get(n as usize % domains.len())
-        .copied()
-        .unwrap_or("example.com")
+    format!("{}.example", encoded)
 }
