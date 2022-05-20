@@ -69,23 +69,31 @@ impl TraceFilter {
     }
 
     fn tmp_table_name(&self) -> String {
-        let prefix = "_customs_tmp_";
+        let prefix = "_customs_tmp";
         match self.initialized.borrow() {
-            s if s.is_empty() => format!("`{}{}`", prefix, self.name),
-            s => format!("`{}`.`{}{}`", s, prefix, self.name),
+            s if s.is_empty() => format!("`{}_{}`", prefix, self.name),
+            s => format!("`{}`.`{}_{}`", s, prefix, self.name),
+        }
+    }
+    fn tmp_table_name_alias(&self, join_table: &str) -> String {
+        let prefix = "_customs_tmp";
+        match self.initialized.borrow() {
+            s if s.is_empty() => format!("`{}_{}_{}`", prefix, self.name, join_table),
+            s => format!("`{}_{}_{}_{}`", s, prefix, self.name, join_table),
         }
     }
 
     fn get_join_filter(&self, info: &TableInfo) -> JoinFilter {
-        let tmp_table = self.tmp_table_name();
         let table_name = &info.table_name;
+        let tmp_table = self.tmp_table_name();
+        let tmp_table_alias = self.tmp_table_name_alias(&table_name);
 
         match self.match_column(info) {
             Some(match_column) => JoinFilter::new(
                 format!(
-                    "LEFT JOIN {tmp_table} ON `{table_name}`.`{match_column}` = {tmp_table}.id"
+                    "LEFT JOIN {tmp_table} AS {tmp_table_alias} ON `{table_name}`.`{match_column}` = {tmp_table_alias}.id"
                 ),
-                format!("{tmp_table}.id IS NOT NULL"),
+                format!("{tmp_table_alias}.id IS NOT NULL"),
             ),
             None => JoinFilter::default(),
         }
