@@ -153,7 +153,7 @@ fn process_table(
 
         join_filter.add(
             format!(
-                " LEFT JOIN `{}` ON `{}`.`{}` = `{}`.`{}`",
+                "LEFT JOIN `{}` ON `{}`.`{}` = `{}`.`{}`",
                 related_only.table,
                 related_only.table,
                 related_only.column,
@@ -161,7 +161,7 @@ fn process_table(
                 related_only.foreign_column.as_deref().unwrap_or("id"),
             ),
             format!(
-                " AND `{}`.`{}` IS NOT NULL",
+                "`{}`.`{}` IS NOT NULL",
                 related_only.table, related_only.column
             ),
         );
