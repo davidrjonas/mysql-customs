@@ -9,14 +9,14 @@ use mysql::Value;
 use serde::Deserialize;
 use xxhash_rust::xxh3;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Transform {
     pub column: String,
     pub kind: TransformKind,
     pub config: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum TransformKind {
     Addr1,

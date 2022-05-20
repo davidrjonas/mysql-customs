@@ -43,19 +43,19 @@ struct Args {
     compress: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Config {
     databases: IndexMap<String, Database>,
     trace_filters: Option<TraceFilterList>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Database {
     pub tables: IndexMap<String, Table>,
     pub trace_filters: Option<TraceFilterList>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Table {
     pub order_column: Option<String>,
     pub filter: Option<String>,
@@ -63,7 +63,7 @@ pub struct Table {
     pub related_only: Option<RelatedTable>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct RelatedTable {
     pub table: String,
     pub column: String,

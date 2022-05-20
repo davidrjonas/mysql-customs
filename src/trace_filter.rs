@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::TableInfo;
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct TraceFilter {
     pub name: String,
     pub source: TraceFilterSource,
@@ -16,7 +16,7 @@ pub struct TraceFilter {
     initialized: Rc<RefCell<String>>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct TraceFilterSource {
     pub db: String,
     pub table: String,
@@ -24,7 +24,7 @@ pub struct TraceFilterSource {
     pub filter: String,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct TraceFilterList(Vec<TraceFilter>);
 
 impl TraceFilter {
