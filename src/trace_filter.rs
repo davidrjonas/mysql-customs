@@ -1,17 +1,22 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use color_eyre::eyre::Result;
 use mysql::prelude::*;
 use serde::Deserialize;
 
 use crate::TableInfo;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct TraceFilter {
     pub name: String,
     pub source: TraceFilterSource,
     pub match_columns: Vec<String>,
+    #[serde(skip)]
+    initialized: Rc<RefCell<String>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct TraceFilterSource {
     pub db: String,
     pub table: String,
@@ -19,22 +24,22 @@ pub struct TraceFilterSource {
     pub filter: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct TraceFilterList(Vec<TraceFilter>);
 
 impl TraceFilter {
-    fn setup(&self, conn: &mut mysql::Conn) -> Result<()> {
+    fn setup(&self, conn: &mut mysql::Conn, current_db_name: &str) -> Result<()> {
         println!("# Setting up trace filter '{}'", self.name);
 
-        let table_name = self.table_name();
+        let tmp_table_name = self.tmp_table_name();
 
-        let sql = format!("DROP TEMPORARY TABLE IF EXISTS `{table_name}`");
+        let sql = format!("DROP TEMPORARY TABLE IF EXISTS {tmp_table_name}");
         dbg!(&sql);
         conn.query_drop(sql)?;
 
         let sql = format!(
-            "CREATE TEMPORARY TABLE `{}` AS (SELECT `{}` FROM `{}`.`{}` WHERE {} ORDER BY `{}` ASC)",
-            table_name,
+            "CREATE TEMPORARY TABLE {} AS (SELECT `{}` FROM `{}`.`{}` WHERE {} ORDER BY `{}` ASC)",
+            tmp_table_name,
             self.source.column,
             self.source.db,
             self.source.table,
@@ -47,28 +52,34 @@ impl TraceFilter {
         conn.query_drop(sql)?;
 
         let count: usize = conn
-            .query_first(format!("SELECT COUNT(*) FROM `{table_name}`"))?
+            .query_first(format!("SELECT COUNT(*) FROM {tmp_table_name}"))?
             .unwrap_or(0);
 
         println!("# Found {count} rows");
 
+        self.initialized.replace(current_db_name.to_owned());
+
         Ok(())
     }
 
-    fn table_name(&self) -> String {
-        format!("_customs_tmp_{}", self.name)
+    fn tmp_table_name(&self) -> String {
+        let prefix = "_customs_tmp_";
+        match self.initialized.borrow() {
+            s if s.is_empty() => format!("`{}{}`", prefix, self.name),
+            s => format!("`{}`.`{}{}`", s, prefix, self.name),
+        }
     }
 
     fn get_join_filter(&self, info: &TableInfo) -> (String, String) {
-        let tmp_table = self.table_name();
+        let tmp_table = self.tmp_table_name();
         let table_name = &info.table_name;
 
         match self.match_column(info) {
             Some(match_column) => (
                 format!(
-                    "LEFT JOIN `{tmp_table}` ON `{table_name}`.`{match_column}` = `{tmp_table}`.id"
+                    "LEFT JOIN {tmp_table} ON `{table_name}`.`{match_column}` = {tmp_table}.id"
                 ),
-                format!("`{tmp_table}`.id IS NOT NULL"),
+                format!("{tmp_table}.id IS NOT NULL"),
             ),
             None => (String::new(), String::new()),
         }
@@ -94,9 +105,25 @@ impl std::ops::Deref for TraceFilterList {
 }
 
 impl TraceFilterList {
-    pub fn setup(&self, conn: &mut mysql::Conn) -> Result<()> {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn append(&self, list: Option<&TraceFilterList>) -> Self {
+        let mut new = Self(self.0.clone());
+        if let Some(x) = list {
+            new.0.extend(x.0.clone());
+        }
+        new
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn setup(&self, conn: &mut mysql::Conn, current_db_name: &str) -> Result<()> {
         for tf in self.as_ref() {
-            tf.setup(conn)?;
+            tf.setup(conn, current_db_name)?;
         }
 
         Ok(())

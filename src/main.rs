@@ -46,6 +46,7 @@ struct Args {
 #[derive(Deserialize)]
 struct Config {
     databases: IndexMap<String, Database>,
+    trace_filters: Option<TraceFilterList>,
 }
 
 #[derive(Deserialize)]
@@ -77,18 +78,37 @@ fn main() -> Result<()> {
     let output = Output::new(args.output, &args.target_directory, args.compress)?;
     let opts = mysql::Opts::from_url(&args.database_url)?;
 
+    let first_db_name = config
+        .databases
+        .keys()
+        .next()
+        .expect("at least one database is required");
+
+    let mut conn =
+        mysql::Conn::new(mysql::OptsBuilder::from_opts(opts.clone()).db_name(Some(first_db_name)))?;
+
+    if let Some(tf_list) = &config.trace_filters {
+        tf_list.setup(&mut conn, first_db_name)?;
+    }
+
     for (db_name, db) in config.databases.iter() {
-        let mut conn =
-            mysql::Conn::new(mysql::OptsBuilder::from_opts(opts.clone()).db_name(Some(db_name)))?;
+        conn.select_db(db_name);
 
         if let Some(tf_list) = &db.trace_filters {
-            tf_list.setup(&mut conn)?;
+            tf_list.setup(&mut conn, db_name)?;
         }
 
         for (table_name, table) in db.tables.iter() {
+            let tf_list = config
+                .trace_filters
+                .as_ref()
+                .map(|x| x.append(db.trace_filters.as_ref()))
+                .unwrap_or_else(|| TraceFilterList::new());
+
             process_table(
                 &mut conn,
                 output.writer(db_name, table_name)?,
+                tf_list,
                 db_name,
                 db,
                 table_name,
@@ -104,6 +124,7 @@ fn main() -> Result<()> {
 fn process_table(
     conn: &mut mysql::Conn,
     writer: Box<dyn Write>,
+    trace_filters: TraceFilterList,
     db_name: &str,
     db: &Database,
     table_name: &str,
@@ -121,15 +142,13 @@ fn process_table(
     };
 
     let mut join = String::new();
-    if let Some(tf_list) = &db.trace_filters {
-        let (tf_join, tf_join_filter) = tf_list.get_join_filter(db, &info);
+    let (tf_join, tf_join_filter) = trace_filters.get_join_filter(db, &info);
 
-        if !tf_join_filter.is_empty() {
-            filter.push_str(" AND ");
-            filter.push_str(&tf_join_filter);
+    if !tf_join_filter.is_empty() {
+        filter.push_str(" AND ");
+        filter.push_str(&tf_join_filter);
 
-            join.push_str(&tf_join);
-        }
+        join.push_str(&tf_join);
     }
 
     if let Some(related_only) = &table.related_only {
@@ -158,7 +177,7 @@ fn process_table(
             .as_str(),
         );
 
-        if let Some(tf_list) = &db.trace_filters {
+        if !trace_filters.is_empty() {
             let related_info = match TableInfo::get(conn, db_name, &related_only.table)? {
                 Some(info) => info,
                 None => {
@@ -174,7 +193,8 @@ fn process_table(
                 .unwrap_or("1")
                 .to_owned();
 
-            let (related_join, related_join_filter) = tf_list.get_join_filter(db, &related_info);
+            let (related_join, related_join_filter) =
+                trace_filters.get_join_filter(db, &related_info);
 
             if !related_join.is_empty() {
                 join.push(' ');
