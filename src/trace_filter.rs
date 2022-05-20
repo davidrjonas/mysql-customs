@@ -24,6 +24,12 @@ pub struct TraceFilterSource {
     pub filter: String,
 }
 
+#[derive(Default, Clone, Debug)]
+pub struct JoinFilter {
+    joins: Vec<String>,
+    filters: Vec<String>,
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct TraceFilterList(Vec<TraceFilter>);
 
@@ -70,18 +76,18 @@ impl TraceFilter {
         }
     }
 
-    fn get_join_filter(&self, info: &TableInfo) -> (String, String) {
+    fn get_join_filter(&self, info: &TableInfo) -> JoinFilter {
         let tmp_table = self.tmp_table_name();
         let table_name = &info.table_name;
 
         match self.match_column(info) {
-            Some(match_column) => (
+            Some(match_column) => JoinFilter::new(
                 format!(
                     "LEFT JOIN {tmp_table} ON `{table_name}`.`{match_column}` = {tmp_table}.id"
                 ),
                 format!("{tmp_table}.id IS NOT NULL"),
             ),
-            None => (String::new(), String::new()),
+            None => JoinFilter::default(),
         }
     }
 
@@ -129,18 +135,65 @@ impl TraceFilterList {
         Ok(())
     }
 
-    pub fn get_join_filter(&self, info: &TableInfo) -> (String, String) {
-        let mut joins: Vec<String> = Vec::new();
-        let mut join_filters: Vec<String> = Vec::new();
+    pub fn get_join_filter(&self, info: &TableInfo) -> JoinFilter {
+        let mut jf = JoinFilter::default();
 
         for tf in self.as_ref() {
-            let (join, filter) = tf.get_join_filter(info);
-            if !join.is_empty() {
-                joins.push(join);
-                join_filters.push(filter);
+            jf.append(tf.get_join_filter(info))
+        }
+
+        jf
+    }
+}
+
+impl JoinFilter {
+    pub fn new(join: String, filter: String) -> Self {
+        Self {
+            joins: vec![join],
+            filters: vec![filter],
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.joins.is_empty()
+    }
+
+    pub fn join_string(&self) -> String {
+        self.joins.join(" ")
+    }
+
+    pub fn filter_string(&self) -> String {
+        if self.filters.is_empty() {
+            "1".to_string()
+        } else {
+            format!("({})", self.filters.join(" AND "))
+        }
+    }
+
+    pub fn add(&mut self, join: String, filter: String) {
+        self.joins.push(join);
+        self.filters.push(filter);
+    }
+
+    pub fn add_filter(&mut self, filter: String) {
+        self.filters.push(filter);
+    }
+
+    pub fn append(&mut self, jf: JoinFilter) {
+        if jf.is_empty() {
+            return;
+        }
+
+        for join in jf.joins {
+            if !self.joins.contains(&join) {
+                self.joins.push(join);
             }
         }
 
-        (joins.join(" "), join_filters.join(" AND "))
+        for filter in jf.filters {
+            if !self.filters.contains(&filter) {
+                self.filters.push(filter);
+            }
+        }
     }
 }

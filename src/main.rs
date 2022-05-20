@@ -133,8 +133,6 @@ fn process_table(
     table: &Table,
     output_kind: OutputKind,
 ) -> Result<()> {
-    let mut filter = table.filter.as_deref().unwrap_or("1").to_owned();
-
     let info = match TableInfo::get(conn, db_name, table_name)? {
         Some(info) => info,
         None => {
@@ -143,15 +141,9 @@ fn process_table(
         }
     };
 
-    let mut join = String::new();
-    let (tf_join, tf_join_filter) = trace_filters.get_join_filter(&info);
+    let mut join_filter = JoinFilter::default();
 
-    if !tf_join_filter.is_empty() {
-        filter.push_str(" AND ");
-        filter.push_str(&tf_join_filter);
-
-        join.push_str(&tf_join);
-    }
+    join_filter.append(trace_filters.get_join_filter(&info));
 
     if let Some(related_only) = &table.related_only {
         // If table has related_only then we want to join to that other table and let its filtering
@@ -159,7 +151,7 @@ fn process_table(
         // _other table_ would have. OR we could select into a temp table the filter data we need
         // from the other table and join on that. That seems safer/easier but two steps.
 
-        join.push_str(
+        join_filter.add(
             format!(
                 " LEFT JOIN `{}` ON `{}`.`{}` = `{}`.`{}`",
                 related_only.table,
@@ -167,16 +159,11 @@ fn process_table(
                 related_only.column,
                 table_name,
                 related_only.foreign_column.as_deref().unwrap_or("id"),
-            )
-            .as_str(),
-        );
-
-        filter.push_str(
+            ),
             format!(
                 " AND `{}`.`{}` IS NOT NULL",
                 related_only.table, related_only.column
-            )
-            .as_str(),
+            ),
         );
 
         if !trace_filters.is_empty() {
@@ -195,34 +182,32 @@ fn process_table(
                 .unwrap_or("1")
                 .to_owned();
 
-            let (related_join, related_join_filter) = trace_filters.get_join_filter(&related_info);
+            let related_jf = trace_filters.get_join_filter(&related_info);
 
-            if !related_join.is_empty() {
-                join.push(' ');
-                join.push_str(&related_join);
-                filter.push_str(" AND ");
-                filter.push_str(&related_filter);
-                filter.push_str(" AND ");
-                filter.push_str(&related_join_filter);
+            if !related_jf.is_empty() {
+                join_filter.append(related_jf);
+                join_filter.add_filter(related_filter);
             }
         }
     }
 
-    let sql = format!(
-        "SELECT COUNT(*) FROM `{}` {} WHERE {}",
-        table_name, join, filter
+    let from_where_sql = format!(
+        "FROM `{}` {} WHERE {}",
+        table_name,
+        join_filter.join_string(),
+        join_filter.filter_string()
     );
+
+    let sql = format!("SELECT COUNT(*) {from_where_sql}");
 
     dbg!(&sql);
 
     let row_count: usize = conn.query_first(sql)?.unwrap_or(0);
 
     let sql = format!(
-        "SELECT `{}`.* FROM `{}` {} WHERE {} ORDER BY `{}`.{} ASC",
+        "SELECT `{}`.* {} ORDER BY `{}`.{} ASC",
         table_name,
-        table_name,
-        join,
-        filter,
+        &from_where_sql,
         table_name,
         table.order_column.as_deref().unwrap_or("id"),
     );
