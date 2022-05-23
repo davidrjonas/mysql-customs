@@ -10,6 +10,8 @@ use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 use xxhash_rust::xxh3;
 
+static ALPHANUM_LOWER: &str = "abcdefghijklmnopqrstuvwxyz0123456789";
+
 #[derive(Deserialize, Debug)]
 pub struct Transform {
     pub column: String,
@@ -170,19 +172,26 @@ fn random_alphanum_lower(rng: &mut impl Rng, len: usize) -> String {
 }
 
 fn hash_email(b: &[u8]) -> String {
-    let mut name = base64::encode(xxh3::xxh3_64(b).to_le_bytes());
-    name.truncate(11);
-    format!("{name}@example.com",)
+    format!("{}@example", hash_to_charset(b, 11, ALPHANUM_LOWER))
 }
 
 fn hash_domain(b: &[u8]) -> String {
-    let charset = "abcdefghijklmnopqrstuvwxyz0123456789";
-    let encoded: String = xxh3::xxh3_64(b)
+    format!("{}.example", hash_to_charset(b, 6, ALPHANUM_LOWER))
+}
+
+fn hash_to_charset(b: &[u8], len: usize, charset: &str) -> String {
+    let charset_len = charset.len() as u8;
+
+    xxh3::xxh3_128(b)
         .to_le_bytes()
         .iter()
-        .take(6)
-        .map(|b| (*b as usize) % charset.len())
-        .map(|n| charset.chars().nth(n).expect("invalid offset of charset"))
-        .collect();
-    format!("{}.example", encoded)
+        .take(len)
+        .map(|b| *b % charset_len)
+        .map(|n| {
+            charset
+                .chars()
+                .nth(n.into())
+                .expect("invalid offset of charset")
+        })
+        .collect()
 }
