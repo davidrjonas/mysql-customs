@@ -53,12 +53,13 @@ databases:
 - `empty`: replace with empty string
 - `null`: replace with \N
 - `replace`: replace with value in `config:` field
+- `replace_if_not_empty`: replace with value in `config:` field if value is not "" or null
 
 #### Hashed Data
 
 Helpful for maintaining uniqueness.
 
-- `email_hash`: [hash of email]@example.com
+- `email_hash`: [hash of email]@example.com. See also `email` for fake emails when uniqueness doesn't matter.
 - `domain_hash`: 4 char hash of original domain plus example.tld where tld is chosen by hash of original
 
 #### Fake Data
@@ -66,18 +67,26 @@ Helpful for maintaining uniqueness.
 - `addr1`: fake data if not empty
 - `addr2`: fake data if not empty
 - `city`: fake data if not empty
+- `country_code`: fake data if not empty. Two-letter code.
+- `email`: fake data if not empty. See also `email_hash` for unique emails.
 - `firstname`: fake data
 - `fullname`: fake data
 - `ipv4`: fake data
+- `ipv6_bin`: fake data, in binary format
 - `ipv6`: fake data
 - `lastname`: fake data
+- `mac_address`: fake data if not empty
 - `organization`: fake company if not empty
+- `phone`: fake data if not empty
 - `postal_code`: fake data
+- `state_code`: fake data if not empty. Two-letter code.
 - `username`: fake data if not empty
 
 #### Random Data
 
 - `hostname`: keep the first two chars, replace the rest with random alphnums.
+- `random_alphanum`: random string of lowercase alphanum of length `config:` if not empty
+- `lorem_ipsum`: string of `config:` chars long (or length of original) from lorem ipsum.
 
 
 Concepts

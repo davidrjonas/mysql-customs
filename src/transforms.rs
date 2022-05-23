@@ -1,9 +1,12 @@
+use std::net::Ipv6Addr;
 use std::str::from_utf8;
 
 use fake::faker::address::en::*;
 use fake::faker::company::en::CompanyName;
-use fake::faker::internet::en::{IPv4, IPv6, Username};
+use fake::faker::internet::en::{IPv4, IPv6, MACAddress, SafeEmail, Username};
+use fake::faker::lorem::en::Words;
 use fake::faker::name::en::*;
+use fake::faker::phone_number::en::PhoneNumber;
 use fake::Fake;
 use mysql::Value;
 use rand::{distributions::Alphanumeric, Rng};
@@ -25,7 +28,9 @@ pub enum TransformKind {
     Addr1,
     Addr2,
     City,
+    CountryCode,
     DomainHash,
+    Email,
     EmailHash,
     Empty,
     Firstname,
@@ -33,11 +38,18 @@ pub enum TransformKind {
     Hostname,
     Ipv4,
     Ipv6,
+    Ipv6Bin,
     Lastname,
+    LoremIpsum,
+    MacAddress,
     Null,
     Organization,
+    Phone,
     PostalCode,
+    RandomAlphanum,
     Replace,
+    ReplaceIfNotEmpty,
+    StateCode,
     Username,
 }
 
@@ -48,6 +60,12 @@ impl TransformKind {
             TransformKind::Replace => match config {
                 Some(s) => *value = Value::Bytes(s.as_bytes().to_owned()),
                 None => *value = Value::Bytes(Vec::new()),
+            },
+            TransformKind::ReplaceIfNotEmpty => match (&value, config) {
+                (Value::Bytes(b), Some(s)) if !b.is_empty() => {
+                    *value = Value::Bytes(s.as_bytes().to_owned())
+                }
+                _ => *value = Value::Bytes(Vec::new()),
             },
             TransformKind::Fullname => {
                 let name: String = Name().fake_with_rng(rng);
@@ -64,10 +82,17 @@ impl TransformKind {
             TransformKind::EmailHash => {
                 let email = match value {
                     Value::Bytes(b) => hash_email(b),
-                    _ => random_alphanum(rng, 10),
+                    _ => hash_email("".as_bytes()),
                 };
                 *value = Value::Bytes(email.into())
             }
+            TransformKind::Email => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    *value = Value::Bytes(SafeEmail().fake_with_rng::<String, _>(rng).into());
+                }
+                Value::Bytes(_) => {}
+                _ => *value = Value::Bytes(Vec::new()),
+            },
             TransformKind::Organization => match value {
                 Value::Bytes(b) if !b.is_empty() => {
                     let name: String = CompanyName().fake_with_rng(rng);
@@ -152,6 +177,64 @@ impl TransformKind {
                 _ => *value = Value::Bytes(Vec::new()),
             },
             TransformKind::Null => *value = Value::NULL,
+            TransformKind::RandomAlphanum => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    let len = config.and_then(|v| v.parse().ok()).unwrap_or(6);
+                    *value = Value::Bytes(random_alphanum(rng, len).into())
+                }
+                _ => *value = Value::Bytes(Vec::new()),
+            },
+            TransformKind::LoremIpsum => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    let len = config.and_then(|v| v.parse().ok()).unwrap_or(20);
+                    *value = Value::Bytes(
+                        Words(0..len) // use len here to generate many more words than we'll need
+                            .fake_with_rng::<Vec<String>, _>(rng)
+                            .join(" ")
+                            .chars()
+                            .take(len)
+                            .collect::<String>()
+                            .into(),
+                    )
+                }
+                _ => *value = Value::Bytes(Vec::new()),
+            },
+            TransformKind::Ipv6Bin => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    let ip: Ipv6Addr = IPv6().fake_with_rng(rng);
+                    *value = Value::Bytes(ip.octets().to_vec())
+                }
+                Value::Bytes(_) => {}
+                _ => *value = Value::Bytes(Vec::new()),
+            },
+            TransformKind::Phone => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    *value = Value::Bytes(PhoneNumber().fake_with_rng::<String, _>(rng).into())
+                }
+                Value::Bytes(_) => {}
+                _ => *value = Value::Bytes(Vec::new()),
+            },
+            TransformKind::StateCode => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    *value = Value::Bytes(StateAbbr().fake_with_rng::<String, _>(rng).into())
+                }
+                Value::Bytes(_) => {}
+                _ => *value = Value::Bytes(Vec::new()),
+            },
+            TransformKind::CountryCode => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    *value = Value::Bytes(CountryCode().fake_with_rng::<String, _>(rng).into())
+                }
+                Value::Bytes(_) => {}
+                _ => *value = Value::Bytes(Vec::new()),
+            },
+            TransformKind::MacAddress => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    *value = Value::Bytes(MACAddress().fake_with_rng::<String, _>(rng).into())
+                }
+                Value::Bytes(_) => {}
+                _ => *value = Value::Bytes(Vec::new()),
+            },
         }
     }
 }
