@@ -1,6 +1,10 @@
 use std::net::Ipv6Addr;
+use std::ops::Range;
+use std::ops::Sub;
 use std::str::from_utf8;
+use std::str::FromStr;
 
+use color_eyre::Result;
 use fake::faker::address::en::*;
 use fake::faker::company::en::CompanyName;
 use fake::faker::internet::en::{IPv4, IPv6, MACAddress, SafeEmail, Username};
@@ -8,6 +12,7 @@ use fake::faker::lorem::en::Words;
 use fake::faker::name::en::*;
 use fake::faker::phone_number::en::PhoneNumber;
 use fake::Fake;
+use itertools::Itertools;
 use mysql::Value;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
@@ -51,6 +56,9 @@ pub enum TransformKind {
     ReplaceIfNotEmpty,
     StateCode,
     Username,
+
+    RandomMoney,
+    RandomInt,
 }
 
 impl TransformKind {
@@ -235,6 +243,29 @@ impl TransformKind {
                 Value::Bytes(_) => {}
                 _ => *value = Value::Bytes(Vec::new()),
             },
+            TransformKind::RandomInt => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    let r = match config {
+                        Some(s) => parse_range(s).unwrap_or(0..i32::MAX),
+                        None => 0..i32::MAX,
+                    };
+                    *value = Value::Bytes(format!("{}", rng.gen_range::<i32, _>(r)).into())
+                }
+                Value::Bytes(_) => {}
+                _ => *value = Value::Bytes(Vec::new()),
+            },
+            TransformKind::RandomMoney => match value {
+                Value::Bytes(b) if !b.is_empty() => {
+                    let max: f32 = match config {
+                        Some(s) => s.parse().unwrap_or(500.00),
+                        None => 500.00,
+                    };
+                    let n = rng.gen_range::<f32, _>(0f32..max);
+                    *value = Value::Bytes(format!("{:.02}", n).into())
+                }
+                Value::Bytes(_) => {}
+                _ => *value = Value::Bytes(Vec::new()),
+            },
         }
     }
 }
@@ -277,4 +308,19 @@ fn hash_to_charset(b: &[u8], len: usize, charset: &str) -> String {
                 .expect("invalid offset of charset")
         })
         .collect()
+}
+
+fn parse_range<T>(s: &str) -> Result<Range<T>>
+where
+    T: PartialOrd<T> + FromStr + Sub + Sub<Output = T> + Copy,
+    <T as FromStr>::Err: Sync + Send + std::error::Error + 'static,
+{
+    if let Some((a, b)) = s.splitn(2, '-').collect_tuple() {
+        let start = a.parse()?;
+        let end = b.parse()?;
+        Ok(start..end)
+    } else {
+        let end = s.parse()?;
+        Ok((end - end)..end)
+    }
 }

@@ -13,6 +13,7 @@ csv = "1.1"
 fake = "2.4"
 flate2 = "1"
 indexmap = { version = "1.8", features = ["serde"] }
+itertools = "0.10"
 indicatif = "0.16"
 mysql = "22"
 rand = "0.8"

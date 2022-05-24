@@ -85,9 +85,10 @@ Helpful for maintaining uniqueness.
 #### Random Data
 
 - `hostname`: keep the first two chars, replace the rest with random alphnums.
-- `random_alphanum`: random string of lowercase alphanum of length `config:` if not empty
 - `lorem_ipsum`: string of `config:` chars long (or length of original) from lorem ipsum.
-
+- `random_alphanum`: random string of lowercase alphanum of length `config:` if not empty
+- `random_int`: i32 in the range of `config:` with format "start-end", if not empty
+- `random_money`: f32 up to `config:`, default 500.00, if not empty
 
 Concepts
 --------
