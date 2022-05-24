@@ -203,13 +203,21 @@ fn process_table(
     dbg!(&sql);
 
     let row_count: usize = conn.query_first(sql)?.unwrap_or(0);
+    let order_column = table.order_column.as_deref().unwrap_or_else(|| {
+        if info.column_names.iter().any(|s| s == "id") {
+            "id"
+        } else {
+            &info
+                .column_names
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or("id")
+        }
+    });
 
     let sql = format!(
         "SELECT `{}`.* {} ORDER BY `{}`.{} ASC",
-        table_name,
-        &from_where_sql,
-        table_name,
-        table.order_column.as_deref().unwrap_or("id"),
+        table_name, &from_where_sql, table_name, order_column,
     );
 
     dbg!(&sql);
