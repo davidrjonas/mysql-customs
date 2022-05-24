@@ -108,8 +108,9 @@ where
         ),
         MYSQL_TYPE_YEAR | MYSQL_TYPE_TINY | MYSQL_TYPE_SHORT => serializer.serialize_i16(
             std::str::from_utf8(bytes)
-                .map(|s| s.parse().expect(format!("valid short; {bytes:?}").as_str()))
-                .unwrap_or_else(|_| i16::from_le_bytes([bytes[0], bytes[1]])), //.expect(format!("valid short; {bytes:?}").as_str()),
+                .expect("valid utf8")
+                .parse()
+                .expect("valid short"),
         ),
         /*
         MYSQL_TYPE_BIT
