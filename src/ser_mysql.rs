@@ -106,7 +106,7 @@ where
                 .parse()
                 .expect("valid long"),
         ),
-        MYSQL_TYPE_YEAR | MYSQL_TYPE_TINY | MYSQL_TYPE_SHORT => serializer.serialize_i16(
+        MYSQL_TYPE_YEAR | MYSQL_TYPE_TINY | MYSQL_TYPE_SHORT => serializer.serialize_i32(
             std::str::from_utf8(bytes)
                 .expect("valid utf8")
                 .parse()
