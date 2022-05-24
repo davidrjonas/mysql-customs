@@ -39,12 +39,12 @@ impl TraceFilter {
 
         let tmp_table_name = self.tmp_table_name();
 
-        let sql = format!("DROP TEMPORARY TABLE IF EXISTS {tmp_table_name}");
-        dbg!(&sql);
-        conn.query_drop(sql)?;
+        // let sql = format!("DROP VIEW IF EXISTS {tmp_table_name}");
+        // dbg!(&sql);
+        // conn.query_drop(sql)?;
 
         let sql = format!(
-            "CREATE TEMPORARY TABLE {} AS (SELECT `{}` FROM `{}`.`{}` WHERE {} ORDER BY `{}` ASC)",
+            "CREATE OR REPLACE VIEW {} AS (SELECT `{}` FROM `{}`.`{}` WHERE {} ORDER BY `{}` ASC)",
             tmp_table_name,
             self.source.column,
             self.source.db,
