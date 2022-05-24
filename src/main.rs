@@ -91,7 +91,7 @@ fn main() -> Result<()> {
     let result = run(&mut conn, &config, &first_db_name, &output);
 
     if let Err(_) = result {
-        println!("Cleaning up...");
+        eprintln!("## Cleaning up...");
         cleanup(&mut conn, &config);
     }
 
@@ -280,14 +280,14 @@ fn cleanup(conn: &mut mysql::Conn, config: &Config) {
         conn.select_db(db_name);
         if let Some(tf_list) = &db.trace_filters {
             if let Err(e) = tf_list.cleanup(conn) {
-                println!("cleanup failed: {:?}", e);
+                eprintln!("{:?}", e.wrap_err("cleanup failed"));
             }
         }
     }
 
     if let Some(tf_list) = &config.trace_filters {
         if let Err(e) = tf_list.cleanup(conn) {
-            println!("cleanup failed: {:?}", e);
+            eprintln!("{:?}", e.wrap_err("cleanup failed"));
         }
     }
 }

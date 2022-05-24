@@ -37,7 +37,7 @@ impl Output {
 
     fn init_dir(dir: &Path) -> Result<()> {
         if !dir.is_dir() {
-            println!("Creating directory {:?}", dir);
+            eprintln!("## Creating directory {:?}", dir);
             std::fs::create_dir_all(dir)?;
         }
         Ok(())
@@ -46,7 +46,7 @@ impl Output {
     pub fn writer(&self, db_name: &str, table_name: &str) -> Result<Box<dyn Write>> {
         match self.kind {
             OutputKind::Stdout => {
-                println!("## {}.{}", db_name, table_name);
+                println!("--- {}.{}", db_name, table_name);
                 Ok(Box::new(std::io::stdout()))
             }
             OutputKind::Dir => {
@@ -55,7 +55,7 @@ impl Output {
                     format!("{}.{}.{}", db_name, table_name, ext).as_str(),
                 ));
 
-                println!("Creating file {:?}", filename);
+                eprintln!("## Creating file {:?}", filename);
 
                 let fh = File::create(&filename).wrap_err_with(|| {
                     format!("Failed to create file for writing; {:?}", &filename)

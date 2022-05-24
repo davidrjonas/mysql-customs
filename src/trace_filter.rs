@@ -35,7 +35,7 @@ pub struct TraceFilterList(Vec<TraceFilter>);
 
 impl TraceFilter {
     fn setup(&self, conn: &mut mysql::Conn, current_db_name: &str) -> Result<()> {
-        println!("# Setting up trace filter '{}'", self.name);
+        eprintln!("## Setting up trace filter '{}'", self.name);
 
         let tmp_table_name = self.tmp_table_name();
 
@@ -57,7 +57,7 @@ impl TraceFilter {
             .query_first(format!("SELECT COUNT(*) FROM {tmp_table_name}"))?
             .unwrap_or(0);
 
-        println!("# Found {count} rows");
+        eprintln!("## Found {count} rows");
 
         self.initialized.replace(current_db_name.to_owned());
 
