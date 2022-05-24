@@ -1,5 +1,4 @@
 use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -133,14 +132,14 @@ fn main() -> Result<()> {
 
 fn process_table(
     conn: &mut mysql::Conn,
-    writer: Box<dyn Write>,
+    output: &Output,
     trace_filters: TraceFilterList,
     db_name: &str,
     db: &Database,
     table_name: &str,
     table: &Table,
-    output_kind: OutputKind,
 ) -> Result<()> {
+    let writer = output.writer(db_name, table_name)?;
     let info = match TableInfo::get(conn, db_name, table_name)? {
         Some(info) => info,
         None => {
@@ -233,7 +232,7 @@ fn process_table(
     let rows: Vec<mysql::Row> = conn.query(sql)?;
 
     let mut progress =
-        output_kind.progress_writer(format!("{db_name}.{table_name}").as_str(), row_count);
+        output.progress_writer(format!("{db_name}.{table_name}").as_str(), row_count);
     let mut wtr = csv::WriterBuilder::new().from_writer(writer);
     wtr.serialize(&info.column_names)?;
 

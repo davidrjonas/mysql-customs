@@ -69,6 +69,10 @@ impl Output {
             }
         }
     }
+
+    pub fn progress_writer(&self, label: &str, total: usize) -> Box<dyn Progress> {
+        self.kind.progress_writer(label, total)
+    }
 }
 
 impl OutputKind {
