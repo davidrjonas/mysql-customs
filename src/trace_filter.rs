@@ -39,10 +39,6 @@ impl TraceFilter {
 
         let tmp_table_name = self.tmp_table_name();
 
-        // let sql = format!("DROP VIEW IF EXISTS {tmp_table_name}");
-        // dbg!(&sql);
-        // conn.query_drop(sql)?;
-
         let sql = format!(
             "CREATE OR REPLACE VIEW {} AS (SELECT `{}` FROM `{}`.`{}` WHERE {} ORDER BY `{}` ASC)",
             tmp_table_name,
@@ -64,6 +60,18 @@ impl TraceFilter {
         println!("# Found {count} rows");
 
         self.initialized.replace(current_db_name.to_owned());
+
+        Ok(())
+    }
+
+    fn cleanup(&self, conn: &mut mysql::Conn) -> Result<()> {
+        let sql = format!("DROP VIEW {}", self.tmp_table_name(),);
+
+        dbg!(&sql);
+
+        conn.query_drop(sql)?;
+
+        self.initialized.replace("".to_owned());
 
         Ok(())
     }
@@ -138,6 +146,14 @@ impl TraceFilterList {
     pub fn setup(&self, conn: &mut mysql::Conn, current_db_name: &str) -> Result<()> {
         for tf in self.as_ref() {
             tf.setup(conn, current_db_name)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn cleanup(&self, conn: &mut mysql::Conn) -> Result<()> {
+        for tf in self.as_ref() {
+            tf.cleanup(conn)?;
         }
 
         Ok(())

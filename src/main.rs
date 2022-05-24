@@ -118,6 +118,14 @@ fn main() -> Result<()> {
                 args.output,
             )?;
         }
+
+        if let Some(tf_list) = &db.trace_filters {
+            tf_list.cleanup(&mut conn)?;
+        }
+    }
+
+    if let Some(tf_list) = &config.trace_filters {
+        tf_list.cleanup(&mut conn)?;
     }
 
     Ok(())
