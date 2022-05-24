@@ -79,9 +79,9 @@ where
         | MYSQL_TYPE_TIMESTAMP
         | MYSQL_TYPE_TIMESTAMP2
         | MYSQL_TYPE_VARCHAR
-        | MYSQL_TYPE_VAR_STRING => {
-            serializer.serialize_str(std::str::from_utf8(bytes).expect("valid utf8"))
-        }
+        | MYSQL_TYPE_VAR_STRING => serializer.serialize_str(
+            std::str::from_utf8(bytes).expect(format!("valid utf8 for {column_type:?}").as_str()),
+        ),
         MYSQL_TYPE_LONG_BLOB | MYSQL_TYPE_MEDIUM_BLOB | MYSQL_TYPE_TINY_BLOB | MYSQL_TYPE_BLOB => {
             serializer.serialize_bytes(bytes)
         }
