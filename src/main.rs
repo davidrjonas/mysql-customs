@@ -88,15 +88,31 @@ fn main() -> Result<()> {
     let mut conn =
         mysql::Conn::new(mysql::OptsBuilder::from_opts(opts.clone()).db_name(Some(first_db_name)))?;
 
+    let result = run(&mut conn, &config, &first_db_name, &output);
+
+    if let Err(_) = result {
+        println!("Cleaning up...");
+        cleanup(&mut conn, &config);
+    }
+
+    result
+}
+
+fn run(
+    conn: &mut mysql::Conn,
+    config: &Config,
+    first_db_name: &str,
+    output: &Output,
+) -> Result<()> {
     if let Some(tf_list) = &config.trace_filters {
-        tf_list.setup(&mut conn, first_db_name)?;
+        tf_list.setup(conn, first_db_name)?;
     }
 
     for (db_name, db) in config.databases.iter() {
         conn.select_db(db_name);
 
         if let Some(tf_list) = &db.trace_filters {
-            tf_list.setup(&mut conn, db_name)?;
+            tf_list.setup(conn, db_name)?;
         }
 
         for (table_name, table) in db.tables.iter() {
@@ -106,25 +122,16 @@ fn main() -> Result<()> {
                 .map(|x| x.append(db.trace_filters.as_ref()))
                 .unwrap_or_else(|| TraceFilterList::new());
 
-            process_table(
-                &mut conn,
-                output.writer(db_name, table_name)?,
-                tf_list,
-                db_name,
-                db,
-                table_name,
-                table,
-                args.output,
-            )?;
+            process_table(conn, &output, tf_list, db_name, db, table_name, table)?;
         }
 
         if let Some(tf_list) = &db.trace_filters {
-            tf_list.cleanup(&mut conn)?;
+            tf_list.cleanup(conn)?;
         }
     }
 
     if let Some(tf_list) = &config.trace_filters {
-        tf_list.cleanup(&mut conn)?;
+        tf_list.cleanup(conn)?;
     }
 
     Ok(())
@@ -266,4 +273,21 @@ fn get_rng_for_table(db_name: &str, table_name: &str) -> StdRng {
     StdRng::seed_from_u64(xxh3::xxh3_64(
         format!("{}.{}", db_name, table_name).as_bytes(),
     ))
+}
+
+fn cleanup(conn: &mut mysql::Conn, config: &Config) {
+    for (db_name, db) in config.databases.iter() {
+        conn.select_db(db_name);
+        if let Some(tf_list) = &db.trace_filters {
+            if let Err(e) = tf_list.cleanup(conn) {
+                println!("cleanup failed: {:?}", e);
+            }
+        }
+    }
+
+    if let Some(tf_list) = &config.trace_filters {
+        if let Err(e) = tf_list.cleanup(conn) {
+            println!("cleanup failed: {:?}", e);
+        }
+    }
 }
