@@ -15,6 +15,7 @@ use fake::Fake;
 use itertools::Itertools;
 use mysql::Value;
 use rand::{distributions::Alphanumeric, Rng};
+use regex::Regex;
 use serde::Deserialize;
 use xxhash_rust::xxh3;
 
@@ -25,6 +26,7 @@ pub struct Transform {
     pub column: String,
     pub kind: TransformKind,
     pub config: Option<String>,
+    pub config2: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -51,18 +53,24 @@ pub enum TransformKind {
     Organization,
     Phone,
     PostalCode,
+    Regex,
     RandomAlphanum,
+    RandomInt,
+    RandomMoney,
     Replace,
     ReplaceIfNotEmpty,
     StateCode,
     Username,
-
-    RandomMoney,
-    RandomInt,
 }
 
 impl TransformKind {
-    pub fn apply(&self, rng: &mut impl Rng, config: Option<&String>, value: &mut Value) {
+    pub fn apply(
+        &self,
+        rng: &mut impl Rng,
+        config: Option<&String>,
+        config2: Option<&String>,
+        value: &mut Value,
+    ) {
         match self {
             TransformKind::Empty => *value = Value::Bytes(Vec::new()),
             TransformKind::Replace => match config {
@@ -266,6 +274,7 @@ impl TransformKind {
                 Value::Bytes(_) => {}
                 _ => *value = Value::Bytes(Vec::new()),
             },
+            TransformKind::Regex => regex_replace(value, config, config2),
         }
     }
 }
@@ -323,4 +332,29 @@ where
         let end = s.parse()?;
         Ok((end - end)..end)
     }
+}
+
+fn regex_replace(
+    value: &mut mysql::Value,
+    maybe_pattern: Option<&String>,
+    maybe_replace: Option<&String>,
+) {
+    let s = match value {
+        Value::Bytes(b) => String::from_utf8(b.to_vec()).unwrap_or("".to_owned()),
+        _ => String::new(),
+    };
+
+    let pattern = match maybe_pattern {
+        Some(s) if !s.is_empty() => s,
+        _ => panic!("regex requires config: for pattern and config2: for replacement"),
+    };
+
+    let replace = match maybe_replace {
+        Some(s) => s.as_str(),
+        _ => "",
+    };
+
+    let re = Regex::new(pattern).expect("invalid regex");
+    let new = re.replace_all(&s, replace);
+    *value = Value::Bytes(new.to_string().into());
 }

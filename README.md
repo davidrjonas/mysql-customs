@@ -54,6 +54,7 @@ databases:
 - `null`: replace with \N
 - `replace`: replace with value in `config:` field
 - `replace_if_not_empty`: replace with value in `config:` field if value is not "" or null
+- `regex`: match value with `config:` and replace all with `config2:`. See https://docs.rs/regex
 
 #### Hashed Data
 

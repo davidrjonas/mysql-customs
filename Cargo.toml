@@ -17,6 +17,7 @@ itertools = "0.10"
 indicatif = "0.16"
 mysql = "22"
 rand = "0.8"
+regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.8"

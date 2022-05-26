@@ -254,9 +254,12 @@ fn process_table(
                 .get_mut(info.get_column_index(transform.column.as_str()))
                 .expect("valid index");
 
-            transform
-                .kind
-                .apply(&mut rng, transform.config.as_ref(), item);
+            transform.kind.apply(
+                &mut rng,
+                transform.config.as_ref(),
+                transform.config2.as_ref(),
+                item,
+            );
         }
 
         let ser = &ser_mysql::Row::new(&info.column_types, &values);
