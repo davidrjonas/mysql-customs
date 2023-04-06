@@ -1,0 +1,68 @@
+# Trace filters are applied to every table listed if any of the match_columns exist
+trace_filters:
+  - name: user_id
+    # Some legacy tables used `userid` without a hyphen.
+    match_columns: ["user_id", "userid"]
+    source:
+      db: petstore
+      table: users
+      column: id
+      # Add join, include everyone with active sub, exclude @example.com,
+      filter: >-
+        id IN (SELECT user_id FROM subscriptions WHERE paid_through > DATE_ADD(NOW(), INTERVAL 65 DAY))
+        AND email NOT LIKE "%@example.com"
+
+databases:
+  # databases is a map with each key being the name of the database
+  petstore:
+    # trace_filters may be at the global or database level. Both will be applied.
+    trace_filters: []
+
+    # tables is a map with each key being the name of the table.
+    # tables are _not_ processed unless listed.
+    tables:
+      users:
+        # transforms is a list specifying the kind of transform, the column to act on,
+        # and a config for the transform. Possible transforms are:
+        #
+        #   addr1, addr2, city, email_hash, empty, firstname, lastname, organization,
+        #   postal_code, replace
+        #
+        # All columns are passed through even if they have no transforms.
+        transforms:
+          - column: email
+            kind: email_hash
+
+          - column: password
+            kind: replace
+            config: $1$J7iYSKio$ivaxbU6RYYBioYb4.cM3y1
+
+      user_contact:
+        # Filters are added to the WHERE clause in addition to database-wide trace filters
+        filter: country IS NOT NULL
+
+        # The table is automatically ordered by `id` but if there is no `id` column specify how it should be ordered with order_column.
+        order_column: user_id
+
+      # To get an entire table with no transforms or filters pass an empty map.
+      user_pref_types: {}
+
+  # Here is an example of using `related_only`. The vendor_history table will
+  # be filtered by the contents of the vendor table which is filtered by the
+  # global trace_filters.
+  backoffice:
+    tables:
+      vendors:
+        transforms:
+          - column: passphrase
+            kind: empty
+        filter: id IN (1, 2, 3, 4)
+
+      vendor_history:
+        order_column: created_at
+        # vendor_history will be filtered by joining to the filtered vendor table.
+        related_only:
+          table: vendors
+          column: id
+          foreign_column: vendor_id
+
