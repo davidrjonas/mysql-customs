@@ -94,7 +94,7 @@ Helpful for maintaining uniqueness.
 Concepts
 --------
 
-### Trace Fitlers
+### Trace Filters
 
 Trace filters allow filtering all tables in a database by related data in a
 single table. For instance, if we want all data from every table that applies
