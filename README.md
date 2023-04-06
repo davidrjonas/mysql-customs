@@ -3,7 +3,7 @@ mysql-customs
 
 A MySQL Subsetter and Sanitizer for Development.
 
-This program reads MySQL tables then writes the data as CSV files filtering and transforming the data in the process. 
+This program reads MySQL tables then writes the data as CSV files filtering and transforming the data in the process.
 
 > You end up with customized stuff, having gone through customs, as is customary.
 >      - Chuck Musser
@@ -42,7 +42,7 @@ databases:
         related_only: # optional
           table: <name of the related table>
           column: <name of column on related table to join to>
-          foreign_column: <name of column on the current table that joins to the related_only.column> 
+          foreign_column: <name of column on the current table that joins to the related_only.column>
 ```
 
 
@@ -103,7 +103,7 @@ that data will be used to filter all other tables.
 
 Trace filters work by creating a temporary table of the results of the filter
 expression then joining each table to that if they contain a column listed in
-`match_column`. 
+`match_column`.
 
 ### Related Only
 
