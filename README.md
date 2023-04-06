@@ -1,7 +1,7 @@
 mysql-customs
 =============
 
-A MySQL Subsetter and Sanitizer for Development.
+A MySQL subsetter and sanitizer for development environments.
 
 This program reads MySQL tables then writes the data as CSV files filtering and transforming the data in the process.
 
